@@ -1,4 +1,4 @@
-import { Nodes, type NodeSpatialIndexKind, type Osm } from "@osmix/core";
+import { Nodes, type NodeSpatialIndexKind, type Osm, ResizeableTypedArray } from "@osmix/core";
 
 const MIB = 2 ** 20;
 const GIB = 2 ** 30;
@@ -168,10 +168,22 @@ export function normalizeOsmSpatialIndexSelection(
   };
 }
 
-const ALL_NODE_SPATIAL_INDEX_LIMIT = 256 * MIB;
-const ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT = 4 * GIB;
-const DEVICE_MEMORY_FRACTION = 0.4;
-const BUFFER_HEADROOM_FRACTION = 0.8;
+/** Thresholds the Auto profile uses to choose Full over View. */
+export const AUTO_LOAD_PROFILE_LIMITS = {
+  /** Largest all-node spatial index Auto builds (4 bytes per node, so 64Mi nodes). */
+  allNodeSpatialIndexBytes: 256 * MIB,
+  /** Largest projected typed-array peak Auto accepts, whatever the device memory. */
+  typedArrayPeakBytes: 4 * GIB,
+  /** Share of the reported device memory the projected peak may use. */
+  deviceMemoryFraction: 0.4,
+  /** Share of the tested largest buffer that one allocation may use. */
+  bufferHeadroomFraction: 0.8,
+} as const;
+
+const ALL_NODE_SPATIAL_INDEX_LIMIT = AUTO_LOAD_PROFILE_LIMITS.allNodeSpatialIndexBytes;
+const ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT = AUTO_LOAD_PROFILE_LIMITS.typedArrayPeakBytes;
+const DEVICE_MEMORY_FRACTION = AUTO_LOAD_PROFILE_LIMITS.deviceMemoryFraction;
+const BUFFER_HEADROOM_FRACTION = AUTO_LOAD_PROFILE_LIMITS.bufferHeadroomFraction;
 
 function flatbushNodeCount(count: number, nodeSize = 128): number {
   if (count === 0) return 0;
@@ -192,9 +204,9 @@ function flatbushBytes(count: number): number {
   return 8 + indexBytes + boxesBytes;
 }
 
-function nextPowerOfTwoBytes(bytes: number): number {
-  if (bytes <= MIB) return MIB;
-  return 2 ** Math.ceil(Math.log2(bytes));
+/** The capacity a growing `Float64Array` bbox column reaches for `bytes` of boxes. */
+function bboxCapacityBytes(bytes: number): number {
+  return ResizeableTypedArray.capacityBytesFor(bytes, Float64Array.BYTES_PER_ELEMENT);
 }
 
 function collectUniqueBuffers(value: unknown, buffers: Set<ArrayBufferLike>): void {
@@ -245,7 +257,7 @@ export function getOsmStorableBufferBytes(osm: Osm): number {
  * The projection deliberately starts from the buffers already owned by `osm`,
  * deduplicating aliased buffers, then adds spatial allocations that have not yet
  * been built. Way and relation bbox compaction peaks include both the growable
- * power-of-two buffer and its fixed-size replacement.
+ * growing buffer (see `ResizeableTypedArray.capacityBytesFor`) and its fixed-size replacement.
  */
 export function projectOsmLoad(osm: Osm): OsmLoadProjection {
   const nodes = osm.nodes.size;
@@ -259,8 +271,8 @@ export function projectOsmLoad(osm: Osm): OsmLoadProjection {
   const relationTreeBytes = flatbushBytes(relations);
   const wayBboxBytes = ways * 4 * Float64Array.BYTES_PER_ELEMENT;
   const relationBboxBytes = relations * 4 * Float64Array.BYTES_PER_ELEMENT;
-  const wayBboxCapacityBytes = nextPowerOfTwoBytes(wayBboxBytes);
-  const relationBboxCapacityBytes = nextPowerOfTwoBytes(relationBboxBytes);
+  const wayBboxCapacityBytes = bboxCapacityBytes(wayBboxBytes);
+  const relationBboxCapacityBytes = bboxCapacityBytes(relationBboxBytes);
   const plannedAllocations = {
     allNodeSpatialIndex: allNodeSpatialIndexBytes,
     taggedNodeSpatialIndex: taggedNodeSpatialIndexBytes,

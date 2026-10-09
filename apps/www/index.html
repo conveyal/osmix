@@ -14,9 +14,10 @@
         <p class="tagline">OpenStreetMap toolkit for the browser</p>
         <nav>
           <a href="https://github.com/conveyal/osmix" target="_blank">GitHub Repo</a>
-          <a href="https://merge.osmix.dev" target="_blank">Merge App</a>
-          <a href="https://inspect.osmix.dev" target="_blank">Inspect App</a>
-          <a href="https://extract.osmix.dev" target="_blank">Extract App</a>
+          <a href="https://app.osmix.dev" target="_blank">App</a>
+          <a href="https://app.osmix.dev/merge" target="_blank">Merge</a>
+          <a href="https://app.osmix.dev/inspect" target="_blank">Inspect</a>
+          <a href="https://app.osmix.dev/extract" target="_blank">Extract</a>
           <a href="https://deepwiki.com/conveyal/osmix" target="_blank">Docs (by DeepWiki)</a>
         </nav>
       </header>
@@ -32,6 +33,21 @@
           in the browser. It provides streaming PBF parsing, memory-efficient indexing,
           raster/vector tile generation, routing, and merge workflows - all running off the main
           thread via Web Workers.
+        </p>
+      </section>
+
+      <section id="limits">
+        <h2>Limits</h2>
+        <p>
+          Osmix keeps each dataset in memory, at about 5&times; the PBF file size. In a browser,
+          files up to about 500 MB load with every feature, and files up to about 1 GB load with the
+          map, search and inspection only. The router reads the <code>highway</code>,
+          <code>oneway</code> and <code>maxspeed</code> tags, and does not model turn restrictions
+          or access tags. See the
+          <a href="https://app.osmix.dev/limits" target="_blank">limits in the app</a> or
+          <a href="https://github.com/conveyal/osmix/blob/main/docs/limits.md" target="_blank"
+            >every limit, with measurements</a
+          >.
         </p>
       </section>
 

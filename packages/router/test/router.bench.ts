@@ -89,9 +89,7 @@ console.log("Setting up benchmark data...");
 // Load Monaco PBF
 const monacoPbf = PBFs["monaco"]!;
 const pbfData = await getFixtureFile(monacoPbf.url);
-const monacoOsm = await fromPbf(pbfData, {
-  buildSpatialIndexes: ["node", "way"],
-});
+const monacoOsm = await fromPbf(pbfData, { loadProfile: "full" });
 const monacoGraph = buildGraph(monacoOsm);
 const monacoRouter = new Router(monacoOsm, monacoGraph);
 

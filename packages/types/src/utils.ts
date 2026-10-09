@@ -82,6 +82,13 @@ export function isMultipolygonRelation(relation: OsmRelation): boolean {
 }
 
 /**
+ * Check if a relation is a turn restriction (`type=restriction`).
+ */
+export function isRestrictionRelation(relation: OsmRelation): boolean {
+  return relation.tags?.["type"] === "restriction";
+}
+
+/**
  * Compute the bounding box of a set of coordinates.
  * Returns `[minLon, minLat, maxLon, maxLat]`.
  */

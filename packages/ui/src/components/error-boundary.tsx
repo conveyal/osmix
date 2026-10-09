@@ -1,7 +1,10 @@
 import * as React from "react";
 
+import { Alert } from "./ui/alert.tsx";
+
 type ErrorBoundaryProps = {
-  fallback: React.ReactNode;
+  /** Rendered instead of the children after an error. Defaults to a destructive `Alert`. */
+  fallback?: (error: Error) => React.ReactNode;
   children: React.ReactNode;
   /** Called with the caught error before it is logged to the console. */
   onError?: (error: Error, info: React.ErrorInfo) => void;
@@ -40,12 +43,15 @@ export class ErrorBoundary extends React.Component<
   }
 
   override render() {
-    if (this.state.error) {
-      // You can render any custom fallback UI
+    const { error } = this.state;
+    if (error) {
+      if (this.props.fallback) return this.props.fallback(error);
       return (
-        <pre className="p-8 border-2 mx-auto mt-8 w-md rounded shadow text-destructive">
-          Error: {this.state.error.message}
-        </pre>
+        <div className="mx-auto mt-8 w-md max-w-full p-2">
+          <Alert variant="destructive" title="Osmix stopped because of an unexpected error">
+            <p>Reload the page to continue. Details: {error.message}</p>
+          </Alert>
+        </div>
       );
     }
 

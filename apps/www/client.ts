@@ -123,14 +123,14 @@ async function loadPbf(data: ArrayBuffer | File, name: string) {
   // Update Stats
   const stats = $("stats-result");
   if (stats && osm) {
-    const [w, s, e, n] = osm.bbox;
+    const bbox = osm.bbox ? osm.bbox.map((v) => v.toFixed(4)).join(", ") : "empty";
     stats.classList.add("has-content");
     stats.innerHTML = `<dl>${Object.entries({
       File: osm.id,
       Nodes: osm.stats.nodes.toLocaleString(),
       Ways: osm.stats.ways.toLocaleString(),
       Relations: osm.stats.relations.toLocaleString(),
-      Bbox: `[${w.toFixed(4)}, ${s.toFixed(4)}, ${e.toFixed(4)}, ${n.toFixed(4)}]`,
+      Bbox: `[${bbox}]`,
     })
       .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
       .join("")}</dl>`;
@@ -150,7 +150,7 @@ async function loadPbf(data: ArrayBuffer | File, name: string) {
 async function renderPreview(dataset: OsmRemoteDataset) {
   const bbox = dataset.bbox;
   const canvas = $<HTMLCanvasElement>("map-canvas");
-  if (!canvas) return;
+  if (!canvas || !bbox) return;
   $("map-result")?.classList.add("has-content");
 
   let zoom = 16;
@@ -245,7 +245,7 @@ function initRouteMap(info: OsmRemoteDataset) {
   routeMap = new maplibregl.Map({
     container: "route-map",
     style: MAP_STYLE,
-    bounds: info.bbox,
+    bounds: info.bbox ?? undefined,
     fitBoundsOptions: { padding: 40 },
   });
 

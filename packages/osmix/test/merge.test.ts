@@ -65,11 +65,15 @@ describe("merge osm", () => {
         nodeChanges: 11_643,
         wayChanges: 4_232,
         relationChanges: 0,
+        createChanges: 15_875,
+        modifyChanges: 0,
+        deleteChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
         intersectionPointsFound: 0,
         intersectionNodesCreated: 0,
+        intersectionNodesRemoved: 0,
       });
       // These expected values are based on the yakima fixture files. If they change,
       // it may indicate a change in entity comparison logic (which uses dequal for
@@ -93,22 +97,30 @@ describe("merge osm", () => {
       expect([...crossingValues.values()].some((value) => value !== "yes")).toBe(true);
 
       changeset = new OsmChangeset(baseOsm);
-      changeset.createIntersectionsForWays(osm2.ways);
+      changeset.createIntersectionsForWays(osm2.ways, osm2.nodes.ids);
 
       // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
       // skipped; only isolated endpoints can use a dedicated intersection fallback.
-      // Existing crossing values are retained, avoiding 68 crossing-only updates.
+      // Existing crossing values are retained, avoiding 68 crossing-only updates, and a
+      // junction where either way ends is not tagged as a crossing.
+      // Candidate ways are visited in ID order, so these counts do not depend on the
+      // spatial index's layout. Imported endpoints with routing tags (such as a gate) snap to
+      // base junctions too, taking their tags (MP-X1).
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_457,
-        nodeChanges: 5_790,
-        wayChanges: 3_667,
+        totalChanges: 6_745,
+        nodeChanges: 3_082,
+        wayChanges: 3_663,
         relationChanges: 0,
+        createChanges: 2_600,
+        modifyChanges: 3_999,
+        deleteChanges: 146,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_091,
-        intersectionNodesCreated: 2_604,
+        intersectionPointsFound: 3_089,
+        intersectionNodesCreated: 2_600,
+        intersectionNodesRemoved: 146,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -120,7 +132,11 @@ describe("merge osm", () => {
       }
 
       expect(sizes(baseOsm)).toEqual({
-        nodes: baseSizes.nodes + patchSizes.nodes + changeset.stats.intersectionNodesCreated,
+        nodes:
+          baseSizes.nodes +
+          patchSizes.nodes +
+          changeset.stats.intersectionNodesCreated -
+          changeset.stats.intersectionNodesRemoved,
         ways: baseSizes.ways + patchSizes.ways,
         relations: baseSizes.relations + patchSizes.relations,
       });
@@ -152,13 +168,8 @@ describe("merge osm", () => {
         ).not.toHaveLength(0);
       }
 
-      expect(baseOsm.nodes.getById(2135545)).toEqual({
-        ...testNode,
-        tags: {
-          ...testNode.tags,
-          crossing: "yes",
-        },
-      });
+      // A kerb where a sidewalk link ends is a junction, not a crossing: its tags are unchanged.
+      expect(baseOsm.nodes.getById(2135545)).toEqual(testNode);
     },
     // This optional integration fixture loads and indexes nearly one million
     // entities before creating intersections. Keep enough headroom for a full
@@ -202,11 +213,15 @@ describe("merge osm", () => {
       nodeChanges: 0,
       wayChanges: 0,
       relationChanges: 0,
+      createChanges: 0,
+      modifyChanges: 0,
+      deleteChanges: 0,
       deduplicatedNodes: 4_835,
       deduplicatedNodesReplaced: 7_542,
       deduplicatedWays: 1_282,
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
     });
 
     baseOsm = applyChangesetToOsm(changeset);
@@ -229,11 +244,15 @@ describe("merge osm", () => {
       nodeChanges: 0,
       wayChanges: 0,
       relationChanges: 0,
+      createChanges: 0,
+      modifyChanges: 0,
+      deleteChanges: 0,
       deduplicatedNodes: 0,
       deduplicatedNodesReplaced: 0,
       deduplicatedWays: 0,
       intersectionPointsFound: 1_014_446,
       intersectionNodesCreated: 243_795,
+      intersectionNodesRemoved: 0,
     });
 
     baseOsm = applyChangesetToOsm(changeset);

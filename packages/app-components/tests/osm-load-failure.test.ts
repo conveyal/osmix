@@ -3,7 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { OsmLoadFailurePanel } from "../src/components/osm-load-failure.tsx";
+import {
+  OsmLoadFailurePanel,
+  OsmLoadFailureTechnicalDetails,
+} from "../src/components/osm-load-failure.tsx";
 
 function structuredError(fields: Record<string, unknown>): Error {
   const message = typeof fields["message"] === "string" ? fields["message"] : "load failed";
@@ -35,6 +38,12 @@ describe("OSM load failure panel", () => {
     expect(html).toContain("Reload using View");
     expect(html).toContain("Dismiss");
     expect(html).toContain("Technical details");
-    expect(html).toContain("Required Bytes");
+    // Technical details start collapsed.
+    expect(html).not.toContain("Required Bytes");
+
+    const details = renderToStaticMarkup(
+      createElement(OsmLoadFailureTechnicalDetails, { technical: failure.technical }),
+    );
+    expect(details).toContain("Required Bytes");
   });
 });

@@ -136,6 +136,7 @@ try {
   const rssAfterLoadBytes = process.memoryUsage.rss();
   peakRssBytes = Math.max(peakRssBytes, rssAfterLoadBytes);
   const viewport: MapViewport = { width: 120, height: 78 };
+  if (info.bbox === null) throw Error(`${filePath} contains no nodes`);
   const camera = MapCamera.fitBounds(info.bbox, viewport);
   const revisions: RevisionMetric[] = [];
   const loader = new OsmTileLoader({

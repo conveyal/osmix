@@ -156,12 +156,7 @@ describe("intersection creation preserves imported junctions", () => {
     async (variant) => {
       const { base, patch } = createPortalFixture(variant);
       expectPortalConnected(patch, patch);
-      const result = await merge(
-        base,
-        patch,
-        { directMerge: true, createIntersections: true },
-        () => {},
-      );
+      const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
       await expectPortalAfterReload(result, patch);
     },
   );
@@ -172,35 +167,27 @@ describe("intersection creation preserves imported junctions", () => {
     const worker = new TestWorker();
     worker.setOsm(base);
     worker.setOsm(patch);
-    await worker.generateChangeset(base.id, patch.id, { directMerge: true });
-    worker.applyChangesAndReplace(base.id);
-    expectPortalConnected(worker.getOsm(base.id), patch);
-    await worker.generateChangeset(base.id, patch.id, { createIntersections: true });
-    worker.applyChangesAndReplace(base.id);
+    worker.planMerge(base.id, patch.id, { mergeIdenticalPoints: false });
+    worker.applyMergePlan(base.id);
     await expectPortalAfterReload(worker.getOsm(base.id), patch);
   });
 
   it("preserves the original junction when substituting an endpoint would collapse an incident way", async () => {
     const { base, patch } = createPortalFixture("unsafe");
     expectPortalConnected(patch, patch);
-    const result = await merge(
-      base,
-      patch,
-      { directMerge: true, createIntersections: true },
-      () => {},
-    );
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
     await expectPortalAfterReload(result, patch, 5);
   });
 
   it("keeps valid junctions separate when combining them would connect a surface way to a bridge interior", async () => {
     const { base, patch } = createPortalFixture("grade-conflict");
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
-    const result = await merge(
+    const baseline = await merge(
       base,
       patch,
-      { directMerge: true, createIntersections: true },
+      { mergeIdenticalPoints: false, createIntersections: false },
       () => {},
     );
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
     const reloaded = await fromPbf(await toPbfBuffer(result), {
       id: "separate-junctions-reloaded",
     });

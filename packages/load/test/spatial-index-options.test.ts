@@ -44,14 +44,13 @@ const subsets: SpatialIndexType[][] = [
 
 const subsetCases = subsets.map((subset) => [subset] as const);
 
-describe("buildSpatialIndexes selection", () => {
-  it("gives an explicit spatialIndexes selection highest precedence and deduplicates kinds", async () => {
+describe("spatial index selection", () => {
+  it("gives an explicit spatialIndexes selection precedence over loadProfile and deduplicates kinds", async () => {
     const osm = await fromPbf(
       await createPbf(),
       {
         spatialIndexes: { nodes: ["tagged", "tagged"], ways: false, relations: false },
         loadProfile: "full",
-        buildSpatialIndexes: ["way"],
       },
       () => {},
     );
@@ -62,21 +61,18 @@ describe("buildSpatialIndexes selection", () => {
     expect(osm.relations.hasSpatialIndex()).toBe(false);
   });
 
-  it("gives an explicit load profile precedence over the deprecated selector", async () => {
+  it.each(subsetCases)("builds exactly the requested indexes: %s", async (requested) => {
     const osm = await fromPbf(
       await createPbf(),
-      { loadProfile: "view", buildSpatialIndexes: ["node"] },
+      {
+        spatialIndexes: {
+          nodes: requested.includes("node") ? ["all"] : [],
+          ways: requested.includes("way"),
+          relations: requested.includes("relation"),
+        },
+      },
       () => {},
     );
-
-    expect(osm.nodes.hasSpatialIndex("tagged")).toBe(true);
-    expect(osm.nodes.hasSpatialIndex("all")).toBe(false);
-    expect(osm.ways.hasSpatialIndex()).toBe(true);
-    expect(osm.relations.hasSpatialIndex()).toBe(true);
-  });
-
-  it.each(subsetCases)("builds exactly the requested indexes: %s", async (requested) => {
-    const osm = await fromPbf(await createPbf(), { buildSpatialIndexes: [...requested] }, () => {});
 
     expect(osm.nodes.hasSpatialIndex()).toBe(requested.includes("node"));
     expect(osm.ways.hasSpatialIndex()).toBe(requested.includes("way"));
@@ -93,7 +89,7 @@ describe("buildSpatialIndexes selection", () => {
     }
   });
 
-  it("builds all spatial indexes when the option is omitted", async () => {
+  it("builds all spatial indexes when no selection or profile is given", async () => {
     const osm = await fromPbf(await createPbf(), {}, () => {});
 
     expect(osm.hasSpatialIndexes()).toBe(true);

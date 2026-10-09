@@ -1,20 +1,26 @@
 import * as Comlink from "comlink";
 import { describe, expect, it } from "vitest";
 
-import { Osm, type OsmConflationDecision, OsmixRemote, OsmixWorker } from "../src/index";
+import {
+  type MergePlanOptions,
+  Osm,
+  OsmixRemote,
+  OsmixWorker,
+  type PlanDecision,
+  type PlanProposal,
+} from "../src/index";
 
-const options = { propertyKeys: ["name"], attachNetwork: false };
-const grouped = { groupBySource: true };
-const first: OsmConflationDecision = {
-  candidateId: "node:101->1",
-  action: "accept",
-  transferProperties: true,
-  attachNetwork: false,
+const options: MergePlanOptions = {
+  mergeIdenticalPoints: false,
+  createIntersections: false,
+  matching: { propertyKeys: ["name"], attachNetwork: false },
 };
-const second: OsmConflationDecision = { ...first, candidateId: "node:101->2" };
-const unrelated: OsmConflationDecision = { candidateId: "node:102->3", action: "reject" };
+const first: PlanDecision = { proposalId: "copy:n101>n1", action: "accept" };
+const second: PlanDecision = { proposalId: "copy:n101>n2", action: "accept" };
+const unrelated: PlanDecision = { proposalId: "copy:n102>n3", action: "reject" };
+const reject = (decision: PlanDecision): PlanDecision => ({ ...decision, action: "reject" });
 
-function inputs(twoAmbiguousSources = false) {
+function inputs() {
   const base = new Osm({ id: "alternatives-base" });
   for (const node of [
     { id: 1, lon: -0.000003, lat: 0, tags: { name: "West entrance" } },
@@ -22,8 +28,6 @@ function inputs(twoAmbiguousSources = false) {
     { id: 3, lon: 0.01, lat: 0, tags: { name: "Other entrance" } },
   ])
     base.nodes.addNode(node);
-  if (twoAmbiguousSources)
-    base.nodes.addNode({ id: 6, lon: 0.010006, lat: 0, tags: { name: "Other alternative" } });
   base.buildIndexes();
   base.buildSpatialIndexes();
   const patch = new Osm({ id: "alternatives-patch" });
@@ -39,22 +43,12 @@ class TestWorker extends OsmixWorker {
     this.set(osm.id, osm);
   }
 
-  seedLegacyDecisions(baseId: string, decisions: OsmConflationDecision[]) {
-    // Reproduce a session created before the invariant was enforced at the API boundary.
-    const session = this["conflations"].get(baseId);
-    if (!session) throw Error("Expected an active review");
-    session.decisions = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+  getOsm(id: string) {
+    return this.get(id);
   }
 }
 
 class RecoveryRemote extends OsmixRemote {
-  async seedLegacyReviewForTest(baseId: string, decisions: OsmConflationDecision[]) {
-    await this.getWorker().restoreConflationReview(baseId, decisions);
-    const state = this["activeConflations"].get(baseId);
-    if (!state) throw Error("Expected a retained review");
-    state.decisions = structuredClone(decisions);
-  }
-
   async restartForTest() {
     const worker = this.getWorker();
     await worker.delete("alternatives-base");
@@ -68,350 +62,157 @@ function setup() {
   const worker = new TestWorker();
   worker.add(base);
   worker.add(patch);
-  worker.discoverConflation(base.id, patch.id, options);
+  worker.planMerge(base.id, patch.id, options);
   return { worker, base, patch };
 }
 
-function reviewState(worker: OsmixWorker, baseId: string) {
+function planState(worker: OsmixWorker, baseId: string) {
   return {
-    summary: worker.getConflationSummary(baseId),
-    page: worker.getConflationPage(baseId, 0, 10),
-    preview: worker.getChangesetPage(baseId, 0, 100),
+    overview: worker.getMergePlanOverview(baseId),
+    page: worker.getMergePlanPage(baseId, 0, 10),
+    osc: worker.getMergePlanOsc(baseId),
   };
 }
 
-describe("alternative target review", () => {
-  it("keeps alternatives together in opt-in pages while preserving flat pagination", () => {
-    const { worker, base } = setup();
-    const flat = worker.getConflationPage(base.id, 0, 1);
-    expect(flat.candidates.map((candidate) => candidate.id)).toEqual(["node:101->1"]);
-    expect(flat).toMatchObject({ totalCandidates: 3, totalPages: 3, pageSize: 1 });
-    expect(flat).not.toHaveProperty("groups");
-    expect(flat.candidates[0]).not.toHaveProperty("matchesFilter");
-    expect(worker.getConflationPage(base.id, 1, 1).candidates[0]?.id).toBe("node:101->2");
-
-    const page = worker.getConflationPage(base.id, 0, 1, grouped);
-    expect(page).toMatchObject({ totalCandidates: 3, totalSources: 2, totalPages: 2, pageSize: 1 });
-    expect(page.groups).toEqual([
-      { entityType: "node", sourceId: 101, candidateIds: ["node:101->1", "node:101->2"] },
-    ]);
-    expect(page.candidates.map((candidate) => [candidate.id, candidate.matchesFilter])).toEqual([
-      ["node:101->1", true],
-      ["node:101->2", true],
-    ]);
-    const next = worker.getConflationPage(base.id, 1, 1, grouped);
-    expect(next.candidates.map((candidate) => candidate.id)).toEqual(["node:102->3"]);
-    expect(next.groups).toEqual([
-      { entityType: "node", sourceId: 102, candidateIds: ["node:102->3"] },
-    ]);
-    const empty = worker.getConflationPage(base.id, 2, 1, grouped);
-    expect(empty.candidates).toEqual([]);
-    expect(empty.groups).toEqual([]);
-  });
-
-  it("includes filtered-out alternatives as context without inflating candidate or bulk counts", () => {
-    const { worker, base } = setup();
-    worker.setConflationDecisions(base.id, [first, unrelated]);
-    for (const filter of [{ status: "accepted" as const }, { targetId: 1 }]) {
-      worker.setConflationFilter(base.id, filter);
-      const page = worker.getConflationPage(base.id, 0, 1, grouped);
-      expect(page).toMatchObject({ totalCandidates: 1, totalSources: 1, totalPages: 1 });
-      expect(page.candidates.map((candidate) => [candidate.id, candidate.matchesFilter])).toEqual([
-        ["node:101->1", true],
-        ["node:101->2", false],
-      ]);
-      expect(page.bulkActions["transfer-properties"]).toMatchObject({
-        filteredCandidates: 1,
-        eligibleCandidates: 0,
-        changedCandidates: 0,
-        skippedCandidates: 1,
-      });
-      expect(page.bulkActions.reject.filteredCandidates).toBe(1);
-      expect(worker.getConflationPage(base.id, 0, 10).candidates).toHaveLength(1);
-    }
-    worker.setConflationFilter(base.id, { sourceId: 102 });
-    expect(worker.getConflationPage(base.id, 0, 1, grouped).groups?.[0]?.sourceId).toBe(102);
-  });
-
-  it.each(["single", "full"] as const)(
-    "rejects a conflicting %s update before changing review or generated preview",
-    (kind) => {
-      const { worker, base } = setup();
-      worker.setConflationDecisions(base.id, [first, unrelated]);
-      worker.generateConflationChangeset(base.id, { directMerge: true });
-      const before = reviewState(worker, base.id);
-      const mutate = () => {
-        if (kind === "single") return worker.setConflationDecision(base.id, second);
-        return worker.setConflationDecisions(base.id, [first, second]);
-      };
-      expect(mutate).toThrow(/(?:node.?101|node 101)/i);
-      expect(reviewState(worker, base.id)).toEqual(before);
-      worker.generateConflationChangeset(base.id, { directMerge: true });
-      expect(worker.getChangesetPage(base.id, 0, 100)).toEqual(before.preview);
-    },
+function proposals(page: { features: { proposals: PlanProposal[] }[] }) {
+  return new Map(
+    page.features
+      .flatMap((feature) => feature.proposals)
+      .map((proposal) => [proposal.id, proposal]),
   );
+}
+
+describe("alternative target review", () => {
+  it("links proposals for the same imported feature as alternatives that need a decision", () => {
+    const { worker, base } = setup();
+    const page = worker.getMergePlanPage(base.id, 0, 1);
+    expect(page.total).toBe(2);
+    expect(page.features[0]).toMatchObject({ key: "node:101", outcome: "needs-decision" });
+    const byId = proposals(page);
+    expect(byId.get(first.proposalId)).toMatchObject({
+      candidateId: "node:101->1",
+      status: "review",
+      effect: "needs-decision",
+      reasons: ["multiple-targets"],
+      alternatives: [second.proposalId],
+    });
+    expect(byId.get(second.proposalId)).toMatchObject({
+      candidateId: "node:101->2",
+      alternatives: [first.proposalId],
+    });
+    const other = proposals(worker.getMergePlanPage(base.id, 1, 1)).get(unrelated.proposalId);
+    expect(other).toMatchObject({ status: "automatic", alternatives: [] });
+  });
+
+  it("refuses to accept two alternatives for one imported feature", () => {
+    const { worker, base } = setup();
+    worker.setMergePlanDecisions(base.id, [first, unrelated]);
+    expect(() => worker.setMergePlanDecisions(base.id, [first, second, unrelated])).toThrow(
+      /node 101/i,
+    );
+  });
+
+  it("rejects a conflicting update before changing the plan", () => {
+    const { worker, base } = setup();
+    worker.setMergePlanDecisions(base.id, [first, unrelated]);
+    const before = planState(worker, base.id);
+    expect(() => worker.setMergePlanDecisions(base.id, [first, second, unrelated])).toThrow(
+      /node 101/i,
+    );
+    expect(planState(worker, base.id)).toEqual(before);
+  });
 
   it("skips ambiguous alternatives in bulk even when one target is already selected", () => {
     const { worker, base } = setup();
-    for (const decisions of [[], [first, unrelated]]) {
-      worker.setConflationDecisions(base.id, decisions);
-      worker.generateConflationChangeset(base.id, { directMerge: true });
-      const before = reviewState(worker, base.id);
-      const result = worker.applyConflationBulkDecision(base.id, {
-        action: "transfer-properties",
-        filter: { sourceId: 101 },
+    // Undecided, the feature waits for a choice between its alternatives; once one is included,
+    // the other is left out and nothing waits.
+    for (const [decisions, waiting] of [
+      [[], 1],
+      [[first, unrelated], 0],
+    ] as const) {
+      worker.setMergePlanDecisions(base.id, [...decisions]);
+      const before = planState(worker, base.id);
+      const result = worker.applyMergePlanBulk(base.id, {
+        action: "accept",
+        filter: { kind: "copy-tags" },
       });
-      expect(result.preview).toMatchObject({
-        filteredCandidates: 2,
-        eligibleCandidates: 0,
-        changedCandidates: 0,
-        skippedCandidates: 2,
-      });
-      expect(reviewState(worker, base.id)).toEqual(before);
+      expect(result).toMatchObject({ changed: 0, waiting });
+      expect(planState(worker, base.id)).toEqual(before);
     }
   });
 
-  it("preserves conflict location across actual Comlink calls without changing the valid preview", async () => {
+  it("can leave an imported feature unmatched by rejecting every alternative", () => {
+    const { worker, base, patch } = setup();
+    worker.setMergePlanDecisions(base.id, [reject(first), reject(second), unrelated]);
+    const byId = proposals(worker.getMergePlanPage(base.id, 0, 10));
+    expect(byId.get(first.proposalId)?.effect).toBe("skipped");
+    expect(byId.get(second.proposalId)?.effect).toBe("skipped");
+    expect(worker.getMergePlanOsc(base.id)).toMatch(/<modify><\/modify>/);
+    worker.applyMergePlan(base.id);
+    const result = worker.getOsm(base.id);
+    expect([...result.nodes.sorted()]).toEqual([...base.nodes.sorted(), ...patch.nodes.sorted()]);
+  });
+
+  it("preserves the conflict message across actual Comlink calls", async () => {
     const { worker, base } = setup();
-    worker.setConflationDecisions(base.id, [first, unrelated]);
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    const before = reviewState(worker, base.id);
+    worker.setMergePlanDecisions(base.id, [first, unrelated]);
     const { port1, port2 } = new MessageChannel();
     Comlink.expose(worker, port1);
     const remote = Comlink.wrap<OsmixWorker>(port2);
     try {
-      await expect(remote.setConflationDecision(base.id, second)).rejects.toMatchObject({
-        conflict: {
-          entityType: "node",
-          sourceId: 101,
-          candidateIds: [first.candidateId, second.candidateId],
-          message: expect.stringMatching(/node.?101/i),
-        },
-      });
-      expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(before.preview);
-      expect(reviewState(worker, base.id)).toEqual(before);
+      await expect(
+        remote.setMergePlanDecisions(base.id, [first, second, unrelated]),
+      ).rejects.toThrow(/copy:n101>n1 and copy:n101>n2 are included, but imported node 101/);
     } finally {
       port1.close();
       port2.close();
     }
   });
 
-  it("keeps legacy conflicts reviewable and permits only explicit source correction", () => {
-    const { worker, base } = setup();
-    worker.setConflationDecisions(base.id, [first, unrelated]);
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    const preview = worker.getChangesetPage(base.id, 0, 100);
-    worker.seedLegacyDecisions(base.id, [first, second, unrelated]);
-    const page = worker.getConflationPage(base.id, 0, 1, grouped);
-    expect(page.candidates.map((candidate) => candidate.decision)).toEqual([first, second]);
-    expect(page.validationConflict).toMatchObject({
-      entityType: "node",
-      sourceId: 101,
-      candidateIds: [first.candidateId, second.candidateId],
-    });
-    for (const action of ["transfer-properties", "attach-network", "reject"] as const) {
-      expect(page.bulkActions[action]).toMatchObject({
-        filteredCandidates: 3,
-        eligibleCandidates: 0,
-        changedCandidates: 0,
-        skippedCandidates: 3,
-      });
-      expect(() => worker.applyConflationBulkDecision(base.id, { action, filter: {} })).toThrow(
-        /node.?101/i,
-      );
-    }
-    expect(() => worker.generateConflationChangeset(base.id, { directMerge: true })).toThrow(
-      /node.?101/i,
-    );
-    expect(worker.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-    expect(worker.getConflationPage(base.id, 0, 1, grouped)).toEqual(page);
-
-    const fixed = worker.setConflationSourceDecision(
-      base.id,
-      { entityType: "node", sourceId: 101 },
-      second,
-    );
-    expect(fixed.decisions).toEqual(
-      expect.arrayContaining([
-        { candidateId: first.candidateId, action: "reject" },
-        second,
-        unrelated,
-      ]),
-    );
-    expect(worker.getConflationPage(base.id, 0, 1, grouped)).not.toHaveProperty(
-      "validationConflict",
-    );
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    expect(
-      worker.getChangesetPage(base.id, 0, 100).changes?.find((change) => change.entity.id === 2),
-    ).toMatchObject({
-      changeType: "modify",
-      entity: { tags: { name: "Imported entrance" } },
-    });
-  });
-
-  it("can leave a source unmatched and rejects a mismatched replacement without losing other choices", () => {
-    const { worker, base } = setup();
-    worker.setConflationDecisions(base.id, [first, unrelated]);
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    const before = reviewState(worker, base.id);
-    expect(() =>
-      worker.setConflationSourceDecision(base.id, { entityType: "node", sourceId: 101 }, unrelated),
-    ).toThrow();
-    expect(reviewState(worker, base.id)).toEqual(before);
-    const result = worker.setConflationSourceDecision(
-      base.id,
-      { entityType: "node", sourceId: 101 },
-      null,
-    );
-    expect(result.decisions).toEqual(
-      expect.arrayContaining([
-        { candidateId: first.candidateId, action: "reject" },
-        { candidateId: second.candidateId, action: "reject" },
-        unrelated,
-      ]),
-    );
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    expect(
-      worker
-        .getChangesetPage(base.id, 0, 100)
-        .changes?.every((change) => change.changeType === "create"),
-    ).toBe(true);
-  });
-
-  it("preserves valid decisions and exact preview through rejected updates and remote recovery", async () => {
+  it("preserves valid decisions and the exact plan through remote recovery", async () => {
     const { base, patch } = inputs();
     using remote = new RecoveryRemote();
     await remote.initializeWorkerPool(1, undefined, undefined, true);
     await remote.transferIn(base);
     await remote.transferIn(patch);
-    await remote.discoverConflation(base.id, patch.id, options);
-    await remote.setConflationDecisions(base.id, [first, unrelated]);
-    await remote.setConflationFilter(base.id, { status: "accepted" });
-    await remote.generateConflationChangeset(base.id, { directMerge: true });
-    const page = await remote.getConflationPage(base.id, 0, 1, grouped);
-    const preview = await remote.getChangesetPage(base.id, 0, 100);
-    await expect(remote.setConflationDecision(base.id, second)).rejects.toThrow(/node.?101/i);
-    await expect(remote.setConflationDecisions(base.id, [first, second])).rejects.toThrow(
-      /node.?101/i,
-    );
-    expect(
-      (
-        await remote.applyConflationBulkDecision(base.id, {
-          action: "transfer-properties",
-          filter: { targetId: 2 },
-        })
-      ).preview,
-    ).toMatchObject({ eligibleCandidates: 0, changedCandidates: 0, skippedCandidates: 1 });
-    expect(await remote.getConflationPage(base.id, 0, 1, grouped)).toEqual(page);
-    expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-
-    await remote.restartForTest();
-
-    expect(await remote.getConflationPage(base.id, 0, 1, grouped)).toEqual(page);
-    expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-    const replaced = await remote.setConflationSourceDecision(
-      base.id,
-      { entityType: "node", sourceId: 101 },
-      second,
-    );
-    expect(replaced.decisions).toEqual(
-      expect.arrayContaining([
-        { candidateId: first.candidateId, action: "reject" },
-        second,
-        unrelated,
-      ]),
-    );
-    await remote.generateConflationChangeset(base.id, { directMerge: true });
-    const replacement = await remote.getChangesetPage(base.id, 0, 100);
-    expect(replacement.changes?.find((change) => change.entity.id === 1)).toBeUndefined();
-    expect(replacement.changes?.find((change) => change.entity.id === 2)).toMatchObject({
-      changeType: "modify",
-      entity: { tags: { name: "Imported entrance" } },
+    await remote.planMerge(base.id, patch.id, options);
+    const decided = await remote.setMergePlanDecisions(base.id, [first, unrelated]);
+    await remote.setMergePlanFilter(base.id, { outcome: "needs-decision" });
+    const page = await remote.getMergePlanPage(base.id, 0, 1);
+    const osc = await remote.getMergePlanOsc(base.id);
+    const bulk = await remote.applyMergePlanBulk(base.id, {
+      action: "accept",
+      filter: { kind: "copy-tags" },
     });
-    expect(replacement.changes?.find((change) => change.entity.id === 3)).toBeUndefined();
+    expect(bulk).toMatchObject({ changed: 0, waiting: 0 });
+
     await remote.restartForTest();
-    expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(replacement);
-    await remote.setConflationFilter(base.id, {});
-    const restored = await remote.getConflationPage(base.id, 0, 10, grouped);
-    expect(
-      restored.candidates.find((candidate) => candidate.id === first.candidateId)?.decision,
-    ).toEqual({ candidateId: first.candidateId, action: "reject" });
-    expect(
-      restored.candidates.find((candidate) => candidate.id === second.candidateId)?.decision,
-    ).toEqual(second);
-    expect(
-      restored.candidates.find((candidate) => candidate.id === unrelated.candidateId)?.decision,
-    ).toEqual(unrelated);
-    await remote.applyChangesAndReplace(base.id);
+
+    expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
+    expect(await remote.getMergePlanPage(base.id, 0, 1)).toEqual(page);
+    expect(await remote.getMergePlanOsc(base.id)).toBe(osc);
+    const replaced = await remote.setMergePlanDecisions(base.id, [
+      reject(first),
+      second,
+      unrelated,
+    ]);
+    expect(replaced.decisions).toEqual([reject(first), second, unrelated]);
+    const replacement = await remote.getMergePlanOsc(base.id);
+    expect(replacement).toMatch(/<modify><node id="2"[^>]*><tag k="name" v="Imported entrance"/);
+    expect(replacement).not.toMatch(/<node id="[13]"/);
+    await remote.restartForTest();
+    expect(await remote.getMergePlanOsc(base.id)).toBe(replacement);
+    await remote.setMergePlanFilter(base.id, {});
+    const restored = proposals(await remote.getMergePlanPage(base.id, 0, 10));
+    expect(restored.get(first.proposalId)?.decision).toBe("reject");
+    expect(restored.get(second.proposalId)?.decision).toBe("accept");
+    expect(restored.get(unrelated.proposalId)?.decision).toBe("reject");
+    await remote.applyMergePlan(base.id);
     const result = await remote.get(base.id);
     const expected = [...base.nodes.sorted(), ...patch.nodes.sorted()].map((node) =>
       node.id === 2 ? { ...node, tags: { name: "Imported entrance" } } : node,
     );
     expect([...result.nodes.sorted()]).toEqual(expected);
-    expect([...result.ways.sorted()]).toEqual([]);
-    expect([...result.relations.sorted()]).toEqual([]);
-  });
-
-  it("restores a partial legacy correction and permits the remaining source to be repaired", async () => {
-    const { base, patch } = inputs(true);
-    using remote = new RecoveryRemote();
-    await remote.initializeWorkerPool(1, undefined, undefined, true);
-    await remote.transferIn(base);
-    await remote.transferIn(patch);
-    await remote.discoverConflation(base.id, patch.id, options);
-    const third: OsmConflationDecision = { candidateId: "node:102->3", action: "accept" };
-    const fourth: OsmConflationDecision = { candidateId: "node:102->6", action: "accept" };
-    await remote.seedLegacyReviewForTest(base.id, [first, second, third, fourth]);
-    expect(
-      (await remote.getConflationPage(base.id, 0, 1, grouped)).validationConflict?.sourceId,
-    ).toBe(101);
-    const partiallyFixed = await remote.setConflationSourceDecision(
-      base.id,
-      { entityType: "node", sourceId: 101 },
-      second,
-    );
-    expect(partiallyFixed.decisions).toEqual(expect.arrayContaining([third, fourth]));
-    await remote.setConflationFilter(base.id, { sourceId: 102 });
-    const unresolved = await remote.getConflationPage(base.id, 0, 1, grouped);
-    expect(unresolved.validationConflict?.sourceId).toBe(102);
-    await expect(remote.setConflationDecisions(base.id, partiallyFixed.decisions)).rejects.toThrow(
-      /node.?102/i,
-    );
-    await expect(
-      remote.generateConflationChangeset(base.id, { directMerge: true }),
-    ).rejects.toThrow(/node.?102/i);
-
-    await remote.restartForTest();
-
-    expect(await remote.getConflationPage(base.id, 0, 1, grouped)).toEqual(unresolved);
-    const fixed = await remote.setConflationSourceDecision(
-      base.id,
-      { entityType: "node", sourceId: 102 },
-      null,
-    );
-    expect(fixed.decisions).toContainEqual(second);
-    expect(fixed.decisions).toEqual(
-      expect.arrayContaining([
-        { candidateId: third.candidateId, action: "reject" },
-        { candidateId: fourth.candidateId, action: "reject" },
-      ]),
-    );
-    await remote.generateConflationChangeset(base.id, { directMerge: true });
-    const preview = await remote.getChangesetPage(base.id, 0, 100);
-    expect(preview.changes?.find((change) => change.entity.id === 2)).toMatchObject({
-      changeType: "modify",
-      entity: { tags: { name: "Imported entrance" } },
-    });
-    await remote.restartForTest();
-    expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-    await remote.applyChangesAndReplace(base.id);
-    const result = await remote.get(base.id);
-    expect([...result.nodes.sorted()]).toEqual(
-      [...base.nodes.sorted(), ...patch.nodes.sorted()].map((node) =>
-        node.id === 2 ? { ...node, tags: { name: "Imported entrance" } } : node,
-      ),
-    );
     expect([...result.ways.sorted()]).toEqual([]);
     expect([...result.relations.sorted()]).toEqual([]);
   });

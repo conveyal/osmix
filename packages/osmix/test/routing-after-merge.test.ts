@@ -27,13 +27,6 @@ import {
   roundTripRoutingOsm,
 } from "./synthetic-routing-fixture.ts";
 
-const ALL_MERGE_STEPS = {
-  createIntersections: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  directMerge: true,
-} as const;
-
 function canonicalOsmDigest(osm: Osm): string {
   const hash = createHash("sha256");
   const updateEntities = (type: string, entities: Iterable<OsmEntity>): void => {
@@ -133,10 +126,10 @@ describe("routing after a Monaco merge", () => {
     const emptyPatch = new Osm({ id: "empty-patch" });
     emptyPatch.buildIndexes();
     emptyPatch.buildSpatialIndexes();
-    merged = await merge(raw, emptyPatch, ALL_MERGE_STEPS, () => undefined);
+    merged = await merge(raw, emptyPatch, {}, () => undefined);
     roundTripped = await roundTripRoutingOsm(merged, "monaco-merged-roundtrip");
     const syntheticPatch = await roundTripRoutingOsm(createMonacoRoutingPatch(raw));
-    patched = await merge(raw, syntheticPatch, ALL_MERGE_STEPS, () => undefined);
+    patched = await merge(raw, syntheticPatch, {}, () => undefined);
     patchedRoundTripped = await roundTripRoutingOsm(patched, "monaco-synthetic-patch-roundtrip");
 
     rawReports = new RoutingTestHarness(raw).runAll(MONACO_ROUTING_CASES);
@@ -399,7 +392,12 @@ describe("routing after explicit fuzzy conflation", () => {
     expect(networkAttachment.ways.getById(849)?.refs.at(-1)).toBe(802);
     expect(networkAttachment.ways.getById(910)?.refs.at(0)).toBe(802);
     expect(networkAttachment.ways.getById(949)?.refs.at(-1)).toBe(902);
-    expect(networkAttachment.nodes.getById(901)).not.toBeNull();
+    // The connection merged tagged point 901 into 802, so 901 is gone and 802 has its tags.
+    expect(networkAttachment.nodes.getById(901)).toBeNull();
+    expect(networkAttachment.nodes.getById(802)?.tags).toMatchObject({
+      name: "Imported endpoint",
+      source: "synthetic survey",
+    });
     expectReportsToMatchCases(attachmentReports, SYNTHETIC_CONFLATION_ATTACHED_CASES);
 
     const ordinaryCar = ordinaryReports.find(
@@ -408,7 +406,12 @@ describe("routing after explicit fuzzy conflation", () => {
     const attachedCar = attachmentReports.find(
       (report) => report.caseId === "synthetic-conflation-car",
     );
-    expect(attachedCar?.graph).toEqual(ordinaryCar?.graph);
+    // The CAR graph keeps its edges and components; it counts one node fewer, since the
+    // connection merged imported point 901 into 802.
+    expect(attachedCar?.graph).toEqual({
+      ...ordinaryCar?.graph,
+      nodes: (ordinaryCar?.graph.nodes ?? 0) - 1,
+    });
 
     const ordinaryWalk = ordinaryReports.find(
       (report) => report.caseId === "synthetic-conflation-walk",

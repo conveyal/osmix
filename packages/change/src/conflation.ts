@@ -2,29 +2,58 @@
 
 import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
-import type { ProgressEvent } from "@osmix/shared/progress";
 import type { LonLat, OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-direction";
 
-import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
 import {
   conflationTagSourceKey,
   conflationTagTargetKey,
   createConflationOutcomeReport,
+  NO_ITEMS,
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
-import { generateChangeset } from "./generate-changeset.ts";
-import { assertConflationPreservesBaseTopology } from "./integrity.ts";
+import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
+import {
+  type EarlierState,
+  earlierStateReader,
+  type PlanOverlay,
+  snapshotState,
+} from "./plan/overlay.ts";
+import { plannedMatchingViews } from "./plan/views.ts";
+import { inputProvenance, type MergeProvenance } from "./provenance.ts";
+import { accessSignature } from "./rules/access.ts";
+import { isAreaWay } from "./rules/area.ts";
+import { hasAdjacentDuplicateRefs, hasTooFewDistinctRefs } from "./rules/collapse.ts";
+import { routingGradeSignature } from "./rules/grade.ts";
+import {
+  lineBbox,
+  lineLength,
+  symmetricLineDistance,
+  tracedLengthThrough,
+} from "./rules/line-geometry.ts";
+import {
+  assessJunction,
+  assessNodeTags,
+  canDropReplacedNode,
+  mergeImportedTags,
+  type NodeIdentityReason,
+} from "./rules/node-identity.ts";
+import {
+  familyCompatible,
+  isProtectedProperty,
+  isRoutingProperty,
+  routingFamilies,
+  wayGradeAccessCompatible,
+  wayRoutingFamily,
+} from "./rules/routing.ts";
+import { conflictingTagKeys, type ImportedTags, keepImportedTags } from "./rules/tags.ts";
 import type {
   OsmConflationActionAssessment,
-  OsmConflationArtifacts,
-  OsmConflationBulkDecisionRequest,
-  OsmConflationBulkDecisionResult,
   OsmConflationCandidate,
-  OsmConflationCandidateFilter,
+  OsmConflationConnectionRival,
   OsmConflationDecision,
   OsmConflationDecisionConflict,
   OsmConflationDiscovery,
@@ -36,102 +65,30 @@ import type {
   OsmConflationRoutingFamily,
   OsmConflationSummary,
   OsmConflationTagDiff,
-  OsmMergeOptions,
   ResolvedOsmConflationOptions,
 } from "./types.ts";
-import { routingGradeSignature } from "./utils.ts";
+import { type DatasetView, type EntityRelationContext, osmDatasetView } from "./views.ts";
 
 // Preserve the historical one-meter matching radius, but only inside this explicit,
 // cross-dataset workflow. Proximity alone never authorizes a topology change.
 const DEFAULT_MAX_DISTANCE_METERS = 1;
 const MAX_BEARING_DIFFERENCE_DEGREES = 30;
+const DEFAULT_TRACE_LENGTH_METERS = 10;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
-const SAMPLE_INTERVAL_METERS = 5;
-
-const PEDESTRIAN_HIGHWAYS = new Set(["corridor", "footway", "path", "pedestrian", "steps"]);
-const BICYCLE_HIGHWAYS = new Set(["cycleway"]);
-const NON_MOTOR_HIGHWAYS = new Set([...PEDESTRIAN_HIGHWAYS, ...BICYCLE_HIGHWAYS, "bridleway"]);
-// Access and routing checks also recognize namespaced variants (for example
-// `access:conditional` and `maxspeed:forward`) so they cannot bypass review.
-const ACCESS_KEYS = [
-  "access",
-  "agricultural",
-  "atv",
-  "bicycle",
-  "bus",
-  "caravan",
-  "carriage",
-  "coach",
-  "emergency",
-  "foot",
-  "forestry",
-  "golf_cart",
-  "goods",
-  "horse",
-  "hgv",
-  "hgv_articulated",
-  "hov",
-  "inline_skates",
-  "mofa",
-  "moped",
-  "motorcycle",
-  "motor_vehicle",
-  "motorcar",
-  "motorhome",
-  "psv",
-  "ski",
-  "snowmobile",
-  "taxi",
-  "tourist_bus",
-  "trailer",
-  "vehicle",
-  "wheelchair",
-] as const;
-const PROTECTED_KEYS = new Set([
-  "area",
-  "bridge",
-  "covered",
-  "layer",
-  "level",
-  "restriction",
-  "tunnel",
-  "type",
-]);
-const ROUTING_KEYS = new Set([
-  ...ACCESS_KEYS,
-  "barrier",
-  "crossing",
-  "highway",
-  "junction",
-  "kerb",
-  "maxspeed",
-  "oneway",
-]);
-
-type EntityRelationContext = {
-  nodes: Set<number>;
-  ways: Set<number>;
-  restrictionNodes: Set<number>;
-  restrictionWays: Set<number>;
-};
 
 type DiscoveryContext = {
   base: Osm;
   patch: Osm;
+  provenance: MergeProvenance;
   options: ResolvedOsmConflationOptions;
-  baseWaysByNode: Map<number, OsmWay[]>;
-  patchWaysByNode: Map<number, OsmWay[]>;
+  /** Targets come from the base side, sources from the imported side. */
+  baseView: DatasetView;
+  patchView: DatasetView;
   baseRelations: EntityRelationContext;
   patchRelations: EntityRelationContext;
+  /** The imported tags a connection may merge into base data (MP-X4). */
+  importedTags: ImportedTags;
 };
-
-// Trusted merge orchestrators keep untouched Osm objects and canonical discovery
-// in the same module instance. This weak registry lets that internal path reuse an
-// expensive discovery without weakening the public generation boundary, which
-// still recomputes candidates before it accepts caller-provided review data.
-const trustedDiscoveries = new WeakMap<OsmConflationDiscovery, { base: Osm; patch: Osm }>();
-const trustedCandidateCollections = new WeakSet<readonly OsmConflationCandidate[]>();
-const trustedCandidateIds = new WeakMap<readonly OsmConflationCandidate[], ReadonlySet<string>>();
 
 function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOptions {
   if (!Array.isArray(options.propertyKeys)) {
@@ -146,6 +103,21 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
   if (options.allowWayRemoval !== undefined && typeof options.allowWayRemoval !== "boolean") {
     throw Error("Conflation allowWayRemoval must be a boolean");
   }
+  if (
+    options.allowWayReplacement !== undefined &&
+    typeof options.allowWayReplacement !== "boolean"
+  ) {
+    throw Error("Conflation allowWayReplacement must be a boolean");
+  }
+  const traceLengthMeters = options.traceLengthMeters ?? DEFAULT_TRACE_LENGTH_METERS;
+  if (!Number.isFinite(traceLengthMeters) || traceLengthMeters <= 0) {
+    throw Error("Conflation traceLengthMeters must be a positive finite number");
+  }
+  const replacementToleranceMeters =
+    options.replacementToleranceMeters ?? DEFAULT_MAX_DISTANCE_METERS;
+  if (!Number.isFinite(replacementToleranceMeters) || replacementToleranceMeters <= 0) {
+    throw Error("Conflation replacementToleranceMeters must be a positive finite number");
+  }
   if (options.automatic != null && !["high-confidence", "none"].includes(options.automatic)) {
     throw Error("Conflation automatic must be high-confidence or none");
   }
@@ -154,18 +126,59 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
     throw Error("Conflation maxDistanceMeters must be a positive finite number");
   }
   const propertyKeys = [...new Set(options.propertyKeys)].toSorted();
-  if (propertyKeys.length === 0 && !options.attachNetwork && !options.allowWayRemoval) {
+  if (
+    propertyKeys.length === 0 &&
+    !options.attachNetwork &&
+    !options.allowWayRemoval &&
+    !options.allowWayReplacement
+  ) {
     throw Error(
-      "Conflation requires at least one property key, network attachment, or explicit way removal",
+      "Conflation requires at least one property key, network attachment, explicit way removal, or way replacement",
     );
   }
   return {
     propertyKeys,
     attachNetwork: options.attachNetwork,
     ...(options.allowWayRemoval ? { allowWayRemoval: true } : {}),
+    ...(options.allowWayReplacement
+      ? { allowWayReplacement: true, replacementToleranceMeters }
+      : {}),
+    traceLengthMeters,
     maxDistanceMeters,
     automatic: options.automatic ?? "high-confidence",
   };
+}
+
+/**
+ * Most imported entities have nothing nearby, and each unmatched candidate used to carry its
+ * own copies of the same empty assessment and evidence (1.36M of them on a regional import,
+ * T34). They share frozen ones instead, by the only things that differ: the reasons and the
+ * source's routing families. They are frozen, so code that mutates one throws instead of
+ * changing every candidate.
+ */
+const UNMATCHED: OsmConflationActionAssessment = Object.freeze({
+  status: "unmatched",
+  reasons: NO_ITEMS,
+});
+const UNMATCHED_CHAIN: OsmConflationActionAssessment = Object.freeze({
+  status: "unmatched",
+  reasons: Object.freeze(["unsupported-way-chain"]) as OsmConflationReasonCode[],
+});
+const unmatchedEvidenceByFamilies = new Map<string, OsmConflationEvidence>();
+
+function unmatchedEvidence(sourceRoutingFamilies: OsmConflationRoutingFamily[]) {
+  const key = sourceRoutingFamilies.join(",");
+  let evidence = unmatchedEvidenceByFamilies.get(key);
+  if (!evidence) {
+    evidence = Object.freeze({
+      distanceMeters: Number.POSITIVE_INFINITY,
+      sourceRoutingFamilies: Object.freeze(sourceRoutingFamilies) as OsmConflationRoutingFamily[],
+      targetRoutingFamilies: NO_ITEMS,
+      tagDiff: NO_ITEMS,
+    });
+    unmatchedEvidenceByFamilies.set(key, evidence);
+  }
+  return evidence;
 }
 
 function candidateId(entityType: "node" | "way", sourceId: number, targetId: number | null) {
@@ -180,120 +193,10 @@ function roundEvidence(value: number) {
   return Number(value.toFixed(6));
 }
 
-function waysByNode(osm: Osm) {
-  const result = new Map<number, OsmWay[]>();
-  for (const way of osm.ways) {
-    for (const ref of new Set(way.refs)) {
-      const ways = result.get(ref) ?? [];
-      ways.push(way);
-      result.set(ref, ways);
-    }
-  }
-  return result;
-}
-
-function relationContext(osm: Osm): EntityRelationContext {
-  const context: EntityRelationContext = {
-    nodes: new Set(),
-    ways: new Set(),
-    restrictionNodes: new Set(),
-    restrictionWays: new Set(),
-  };
-  for (const relation of osm.relations) {
-    const restriction = relation.tags?.["type"] === "restriction";
-    for (const member of relation.members) {
-      if (member.type === "node") {
-        context.nodes.add(member.ref);
-        if (restriction) context.restrictionNodes.add(member.ref);
-      } else if (member.type === "way") {
-        context.ways.add(member.ref);
-        if (restriction) context.restrictionWays.add(member.ref);
-      }
-    }
-  }
-  return context;
-}
-
-function isAreaWay(way: OsmWay) {
-  if (String(way.tags?.["area"] ?? "") === "yes") return true;
-  if (way.refs.length < 4 || way.refs[0] !== way.refs.at(-1)) return false;
-  return ["building", "landuse", "natural", "boundary"].some((key) => way.tags?.[key] != null);
-}
-
-function wayRoutingFamily(way: OsmWay): OsmConflationRoutingFamily {
-  const highway = String(way.tags?.["highway"] ?? "");
-  if (!highway || isAreaWay(way)) return "non-routable";
-  if (
-    BICYCLE_HIGHWAYS.has(highway) ||
-    (highway === "path" && !["no", "private"].includes(String(way.tags?.["bicycle"] ?? "")))
-  ) {
-    return "bicycle-shared";
-  }
-  if (PEDESTRIAN_HIGHWAYS.has(highway)) return "pedestrian";
-  // Unknown highway values stay in the motor family. Treating a potentially
-  // drivable way as non-routable would make an unsafe attachment look harmless.
-  if (!NON_MOTOR_HIGHWAYS.has(highway)) return "motor-road";
-  return "non-routable";
-}
-
-function routingFamilies(ways: readonly OsmWay[]) {
-  const families = new Set(ways.map(wayRoutingFamily));
-  if (families.size > 1) families.delete("non-routable");
-  return [...families].toSorted() as OsmConflationRoutingFamily[];
-}
-
-function familyCompatible(a: OsmConflationRoutingFamily, b: OsmConflationRoutingFamily) {
-  if (a === b) return true;
-  return (
-    (a === "pedestrian" && b === "bicycle-shared") || (a === "bicycle-shared" && b === "pedestrian")
-  );
-}
-
-function accessSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter((key) =>
-      ACCESS_KEYS.some((accessKey) => key === accessKey || key.startsWith(`${accessKey}:`)),
-    )
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
-// These signatures intentionally compare both presence and value. Rewriting a
-// patch reference must not strand node-level routing semantics on the discarded node.
-function barrierSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter((key) => key === "barrier" || key.startsWith("barrier:"))
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
-function nodeRoutingSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter(
-      (key) =>
-        isRoutingProperty(key) &&
-        !ACCESS_KEYS.some((accessKey) => key === accessKey || key.startsWith(`${accessKey}:`)) &&
-        key !== "barrier" &&
-        !key.startsWith("barrier:"),
-    )
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
 function wayContextsCompatible(source: OsmWay, target: OsmWay) {
   return (
     familyCompatible(wayRoutingFamily(source), wayRoutingFamily(target)) &&
     wayGradeAccessCompatible(source, target)
-  );
-}
-
-function wayGradeAccessCompatible(source: OsmWay, target: OsmWay) {
-  return (
-    routingGradeSignature(source.tags) === routingGradeSignature(target.tags) &&
-    accessSignature(source.tags) === accessSignature(target.tags)
   );
 }
 
@@ -338,16 +241,6 @@ function wayRoutingSemanticsCompatible(
   );
 }
 
-function isProtectedProperty(key: string) {
-  return PROTECTED_KEYS.has(key) || key.startsWith("restriction:");
-}
-
-function isRoutingProperty(key: string) {
-  return [...ROUTING_KEYS].some(
-    (routingKey) => key === routingKey || key.startsWith(`${routingKey}:`),
-  );
-}
-
 function selectedTagDiff(
   source: OsmEntity,
   target: OsmEntity,
@@ -389,6 +282,8 @@ function propertyAssessment(
 
 function nodePropertyAssessment(
   context: DiscoveryContext,
+  source: OsmNode,
+  target: OsmNode,
   patchWays: readonly OsmWay[],
   baseWays: readonly OsmWay[],
   tagDiff: readonly OsmConflationTagDiff[],
@@ -422,11 +317,12 @@ function nodePropertyAssessment(
     ) {
       reasons.push("routing-family-conflict");
     }
-    if (
-      !patchRoutable.every((source) =>
-        baseRoutable.some((target) => wayGradeAccessCompatible(source, target)),
-      )
-    ) {
+    // The same junction rule as a connection (G5): the target must be a point the imported
+    // ways could join, not one where some base way is grade-separated from them.
+    const junction = assessJunction(target.id, source.id, patchRoutable, baseRoutable, {
+      junctionWays: baseWays.filter((way) => way.tags?.["highway"] != null),
+    });
+    if (junction.includes("grade-conflict")) {
       reasons.push("grade-conflict");
       hardConflict = true;
     }
@@ -445,93 +341,6 @@ function nodePropertyAssessment(
   return assessment;
 }
 
-function lineLength(coordinates: readonly LonLat[]) {
-  let total = 0;
-  for (let index = 1; index < coordinates.length; index++) {
-    total += haversineDistance(coordinates[index - 1]!, coordinates[index]!);
-  }
-  return total;
-}
-
-function interpolate(a: LonLat, b: LonLat, parameter: number): LonLat {
-  return [a[0] + (b[0] - a[0]) * parameter, a[1] + (b[1] - a[1]) * parameter];
-}
-
-function sampleLine(coordinates: readonly LonLat[]) {
-  if (coordinates.length <= 1) return [...coordinates];
-  const result: LonLat[] = [coordinates[0]!];
-  for (let index = 1; index < coordinates.length; index++) {
-    const start = coordinates[index - 1]!;
-    const end = coordinates[index]!;
-    const length = haversineDistance(start, end);
-    const samples = Math.floor(length / SAMPLE_INTERVAL_METERS);
-    for (let sample = 1; sample <= samples; sample++) {
-      const distance = sample * SAMPLE_INTERVAL_METERS;
-      if (distance >= length) break;
-      result.push(interpolate(start, end, distance / length));
-    }
-    result.push(end);
-  }
-  return result;
-}
-
-function pointSegmentDistance(point: LonLat, start: LonLat, end: LonLat) {
-  const latitudeRadians = (point[1] * Math.PI) / 180;
-  const xScale = 111_320 * Math.cos(latitudeRadians);
-  const yScale = 110_574;
-  const startX = (start[0] - point[0]) * xScale;
-  const startY = (start[1] - point[1]) * yScale;
-  const endX = (end[0] - point[0]) * xScale;
-  const endY = (end[1] - point[1]) * yScale;
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const denominator = dx * dx + dy * dy;
-  const parameter =
-    denominator === 0 ? 0 : Math.max(0, Math.min(1, -(startX * dx + startY * dy) / denominator));
-  return Math.hypot(startX + parameter * dx, startY + parameter * dy);
-}
-
-function pointLineDistance(point: LonLat, line: readonly LonLat[]) {
-  let minimum = Number.POSITIVE_INFINITY;
-  for (let index = 1; index < line.length; index++) {
-    minimum = Math.min(minimum, pointSegmentDistance(point, line[index - 1]!, line[index]!));
-  }
-  return minimum;
-}
-
-function symmetricLineDistance(a: readonly LonLat[], b: readonly LonLat[]) {
-  let maximum = 0;
-  for (const point of sampleLine(a)) maximum = Math.max(maximum, pointLineDistance(point, b));
-  for (const point of sampleLine(b)) maximum = Math.max(maximum, pointLineDistance(point, a));
-  return maximum;
-}
-
-function wayCoordinates(osm: Osm, way: OsmWay) {
-  const index = osm.ways.ids.getIndexFromId(way.id);
-  return index < 0 ? [] : osm.ways.getResolvedCoordinates(index);
-}
-
-function lineBbox(
-  coordinates: readonly LonLat[],
-  paddingMeters: number,
-): [number, number, number, number] {
-  let minLon = Number.POSITIVE_INFINITY;
-  let minLat = Number.POSITIVE_INFINITY;
-  let maxLon = Number.NEGATIVE_INFINITY;
-  let maxLat = Number.NEGATIVE_INFINITY;
-  for (const [lon, lat] of coordinates) {
-    minLon = Math.min(minLon, lon);
-    minLat = Math.min(minLat, lat);
-    maxLon = Math.max(maxLon, lon);
-    maxLat = Math.max(maxLat, lat);
-  }
-  const middleLat = (minLat + maxLat) / 2;
-  const latPadding = paddingMeters / 110_574;
-  const lonPadding =
-    paddingMeters / (111_320 * Math.max(0.01, Math.cos((middleLat * Math.PI) / 180)));
-  return [minLon - lonPadding, minLat - latPadding, maxLon + lonPadding, maxLat + latPadding];
-}
-
 function bearing(from: LonLat, to: LonLat) {
   const latitude1 = (from[1] * Math.PI) / 180;
   const latitude2 = (to[1] * Math.PI) / 180;
@@ -548,8 +357,8 @@ function undirectedBearingDifference(a: number, b: number) {
   return Math.min(directed, 360 - directed, Math.abs(180 - directed));
 }
 
-function nodeSegments(osm: Osm, nodeId: number, ways: readonly OsmWay[]) {
-  const node = osm.nodes.getById(nodeId);
+function nodeSegments(view: DatasetView, nodeId: number, ways: readonly OsmWay[]) {
+  const node = view.getNode(nodeId);
   if (!node) return [];
   const segments: { bearing: number; way: OsmWay }[] = [];
   for (const way of ways) {
@@ -558,7 +367,7 @@ function nodeSegments(osm: Osm, nodeId: number, ways: readonly OsmWay[]) {
       for (const neighborIndex of [index - 1, index + 1]) {
         const neighborId = way.refs[neighborIndex];
         if (neighborId == null || neighborId === nodeId) continue;
-        const neighbor = osm.nodes.getById(neighborId);
+        const neighbor = view.getNode(neighborId);
         if (!neighbor) continue;
         segments.push({
           bearing: bearing([node.lon, node.lat], [neighbor.lon, neighbor.lat]),
@@ -568,6 +377,102 @@ function nodeSegments(osm: Osm, nodeId: number, ways: readonly OsmWay[]) {
     }
   }
   return segments;
+}
+
+/** Rulebook reasons map onto the public reason codes; an imported point has no tag conflict. */
+function toReasonCode(reason: NodeIdentityReason): OsmConflationReasonCode {
+  if (reason === "tag-conflict") throw Error("A connection's imported point cannot conflict");
+  return reason;
+}
+
+/**
+ * Whether connecting `source` to `target` would break a patch turn restriction: the restriction's
+ * node members follow the source, and its ways follow the rewritten source ways.
+ */
+function connectionBreaksRestriction(
+  context: DiscoveryContext,
+  source: OsmNode,
+  target: OsmNode,
+  sourceWays: readonly OsmWay[],
+) {
+  const rewritten = new Map(
+    sourceWays.map((way) => [
+      way.id,
+      { ...way, refs: way.refs.map((ref) => (ref === source.id ? target.id : ref)) },
+    ]),
+  );
+  for (const relation of context.patchView.relations()) {
+    if (relation.tags?.["type"] !== "restriction") continue;
+    const involved = relation.members.some(
+      (member) =>
+        (member.type === "node" && member.ref === source.id) ||
+        (member.type === "way" && rewritten.has(member.ref)),
+    );
+    if (!involved) continue;
+    const proposed = {
+      ...relation,
+      members: relation.members.map((member) =>
+        member.type === "node" && member.ref === source.id ? { ...member, ref: target.id } : member,
+      ),
+    };
+    const issues = restrictionTopologyIssues(
+      proposed,
+      (id) => rewritten.get(id) ?? context.patchView.getWay(id) ?? context.baseView.getWay(id),
+    );
+    if (issues.length > 0) return true;
+  }
+  return false;
+}
+
+/** Whether `nodeId` is only at an open way's first or last position. */
+function isWayEnd(way: OsmWay, nodeId: number) {
+  const first = way.refs[0];
+  const last = way.refs.at(-1);
+  if (first === last) return false;
+  return way.refs.every(
+    (ref, index) => ref !== nodeId || index === 0 || index === way.refs.length - 1,
+  );
+}
+
+/**
+ * The longest stretch of an imported way, through `source` as an interior point, that stays
+ * within the matching radius of a compatible base way at the target. Counting stops at the
+ * trace length, which is all the rule needs.
+ */
+function tracedLengthAlongBase(
+  context: DiscoveryContext,
+  source: OsmNode,
+  sourceWays: readonly OsmWay[],
+  targetWays: readonly OsmWay[],
+) {
+  const { maxDistanceMeters, traceLengthMeters } = context.options;
+  const coordinates = (view: DatasetView, way: OsmWay) => {
+    const line: LonLat[] = [];
+    for (const ref of way.refs) {
+      const node = view.getNode(ref);
+      if (!node) return null;
+      line.push([node.lon, node.lat]);
+    }
+    return line;
+  };
+  let longest = 0;
+  for (const sourceWay of sourceWays) {
+    const index = sourceWay.refs.indexOf(source.id);
+    if (index <= 0 || index >= sourceWay.refs.length - 1) continue;
+    const line = coordinates(context.patchView, sourceWay);
+    if (!line) continue;
+    for (const targetWay of targetWays) {
+      if (!wayContextsCompatible(sourceWay, targetWay)) continue;
+      const baseLine = coordinates(context.baseView, targetWay);
+      if (!baseLine || baseLine.length < 2) continue;
+      longest = Math.max(
+        longest,
+        tracedLengthThrough(line, index, baseLine, maxDistanceMeters, traceLengthMeters),
+      );
+      if (longest >= traceLengthMeters) return longest;
+    }
+  }
+  return longest;
 }
 
 function nodeAttachmentAssessment(
@@ -580,7 +485,8 @@ function nodeAttachmentAssessment(
   if (!context.options.attachNetwork)
     return { assessment: { status: "blocked", reasons: [] }, evidence: {} };
   const sourceWays = patchWays.filter(
-    (way) => !context.base.ways.ids.has(way.id) && wayRoutingFamily(way) !== "non-routable",
+    (way) =>
+      context.provenance.isImported("way", way.id) && wayRoutingFamily(way) !== "non-routable",
   );
   const targetWays = baseWays.filter((way) => wayRoutingFamily(way) !== "non-routable");
   if (sourceWays.length === 0 || targetWays.length === 0) {
@@ -592,28 +498,12 @@ function nodeAttachmentAssessment(
 
   // Hard reasons describe invariants a manual decision cannot override. Review
   // reasons are plausible matches whose routing intent still needs a person.
-  const hardReasons: OsmConflationReasonCode[] = [];
-  const reviewReasons: OsmConflationReasonCode[] = [];
-  if (routingGradeSignature(source.tags) !== routingGradeSignature(target.tags)) {
-    hardReasons.push("grade-conflict");
-  }
-  if (accessSignature(source.tags) !== accessSignature(target.tags)) {
-    hardReasons.push("routing-family-conflict");
-  }
-  const sourceBarrier = barrierSignature(source.tags);
-  const targetBarrier = barrierSignature(target.tags);
-  if (sourceBarrier !== targetBarrier) hardReasons.push("routing-family-conflict");
-  else if (sourceBarrier !== "") reviewReasons.push("node-context-conflict");
-  if (nodeRoutingSignature(source.tags) !== nodeRoutingSignature(target.tags)) {
-    hardReasons.push("routing-family-conflict");
-  }
-  if (
-    ["layer", "level", "bridge", "tunnel", "covered"].some(
-      (key) => source.tags?.[key] != null || target.tags?.[key] != null,
-    )
-  ) {
-    reviewReasons.push("node-context-conflict");
-  }
+  // The imported point's tags merge into the base point, as an identical-point merge's do.
+  const nodeTags = assessNodeTags(context.importedTags(source.tags), target.tags, {
+    sourceIsImported: true,
+  });
+  const hardReasons: OsmConflationReasonCode[] = [...nodeTags.hardReasons].map(toReasonCode);
+  const reviewReasons: OsmConflationReasonCode[] = [...nodeTags.reviewReasons].map(toReasonCode);
   const restrictionMember =
     context.patchRelations.restrictionNodes.has(source.id) ||
     context.baseRelations.restrictionNodes.has(target.id) ||
@@ -624,8 +514,13 @@ function nodeAttachmentAssessment(
     context.baseRelations.nodes.has(target.id) ||
     sourceWays.some((way) => context.patchRelations.ways.has(way.id)) ||
     targetWays.some((way) => context.baseRelations.ways.has(way.id));
-  if (restrictionMember) hardReasons.push("relation-member");
-  else if (relationMember) reviewReasons.push("relation-member");
+  // Relation node members follow the connection. A restriction the rewrite would break blocks
+  // it; any other relation involvement, including an intact restriction, needs review.
+  if (restrictionMember && connectionBreaksRestriction(context, source, target, sourceWays)) {
+    hardReasons.push("relation-member");
+  } else if (restrictionMember || relationMember) {
+    reviewReasons.push("relation-member");
+  }
 
   const sourceFamilies = routingFamilies(sourceWays);
   const targetFamilies = routingFamilies(targetWays);
@@ -645,17 +540,22 @@ function nodeAttachmentAssessment(
     reviewReasons.push("routing-family-conflict");
   }
 
-  const gradeCompatible = sourceWays.every((sourceWay) =>
-    targetWays.some(
-      (targetWay) =>
-        routingGradeSignature(sourceWay.tags) === routingGradeSignature(targetWay.tags) &&
-        accessSignature(sourceWay.tags) === accessSignature(targetWay.tags),
-    ),
+  hardReasons.push(
+    ...assessJunction(target.id, source.id, sourceWays, targetWays, {
+      junctionWays: baseWays.filter((way) => way.tags?.["highway"] != null),
+    }).map(toReasonCode),
   );
-  if (!gradeCompatible) hardReasons.push("grade-conflict");
 
-  const sourceSegments = nodeSegments(context.patch, source.id, sourceWays);
-  const targetSegments = nodeSegments(context.base, target.id, targetWays);
+  // An interior point of an imported way that runs along the target's base way is a copy of
+  // that path, not a point where paths meet: connecting it would weld two parallel lines.
+  const tracedLength = tracedLengthAlongBase(context, source, sourceWays, targetWays);
+  if (tracedLength >= context.options.traceLengthMeters) hardReasons.push("traces-base-way");
+
+  // A path's end meets another at whatever angle the corner has; only points along a way
+  // must line up with the base way they join.
+  const wayEnd = sourceWays.every((way) => isWayEnd(way, source.id));
+  const sourceSegments = wayEnd ? [] : nodeSegments(context.patchView, source.id, sourceWays);
+  const targetSegments = nodeSegments(context.baseView, target.id, targetWays);
   let maximumMinimumBearingDifference = 0;
   // Every imported incident segment needs at least one compatible base segment.
   // Taking the worst best-match prevents one aligned arm from hiding another.
@@ -671,19 +571,12 @@ function nodeAttachmentAssessment(
     maximumMinimumBearingDifference = Math.max(maximumMinimumBearingDifference, minimum);
   }
   if (
-    sourceSegments.length === 0 ||
-    !Number.isFinite(maximumMinimumBearingDifference) ||
-    maximumMinimumBearingDifference > MAX_BEARING_DIFFERENCE_DEGREES
+    !wayEnd &&
+    (sourceSegments.length === 0 ||
+      !Number.isFinite(maximumMinimumBearingDifference) ||
+      maximumMinimumBearingDifference > MAX_BEARING_DIFFERENCE_DEGREES)
   ) {
     reviewReasons.push("bearing-mismatch");
-  }
-
-  for (const way of sourceWays) {
-    const replacedRefs = way.refs.map((ref) => (ref === source.id ? target.id : ref));
-    const adjacentDuplicate = replacedRefs.some(
-      (ref, index) => index > 0 && ref === replacedRefs[index - 1],
-    );
-    if (adjacentDuplicate || new Set(replacedRefs).size < 2) hardReasons.push("would-collapse-way");
   }
 
   const reasons = uniqueReasons([...hardReasons, ...reviewReasons]);
@@ -697,9 +590,11 @@ function nodeAttachmentAssessment(
     assessment: { status, reasons },
     evidence: {
       patchWayIds: sourceWays.map((way) => way.id).toSorted((a, b) => a - b),
-      bearingDifferenceDegrees: Number.isFinite(maximumMinimumBearingDifference)
-        ? roundEvidence(maximumMinimumBearingDifference)
-        : undefined,
+      bearingDifferenceDegrees:
+        !wayEnd && Number.isFinite(maximumMinimumBearingDifference)
+          ? roundEvidence(maximumMinimumBearingDifference)
+          : undefined,
+      ...(tracedLength > 0 ? { tracedLengthMeters: roundEvidence(tracedLength) } : {}),
     },
   };
 }
@@ -735,23 +630,25 @@ function addReviewReason(candidate: OsmConflationCandidate, reason: OsmConflatio
 
 function discoverNodeCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
-  for (const source of context.patch.nodes.sorted()) {
+  for (const source of context.patchView.nodes()) {
     // Same-ID entities belong to ordinary merge semantics; fuzzy matching must not
     // reinterpret an authoritative patch update.
-    if (context.base.nodes.ids.has(source.id)) continue;
-    const patchWays = context.patchWaysByNode.get(source.id) ?? [];
+    if (context.provenance.isBase("node", source.id)) continue;
+    const patchWays = context.patchView.waysAtNode(source.id);
     const eligible =
       context.options.propertyKeys.some((key) => source.tags?.[key] != null) ||
       (context.options.attachNetwork &&
-        patchWays.some((way) => !context.base.ways.ids.has(way.id)));
+        patchWays.some((way) => context.provenance.isImported("way", way.id)));
     if (!eligible) continue;
 
-    const nearby = context.base.nodes
-      .findIndexesWithinRadius(source.lon, source.lat, context.options.maxDistanceMeters / 1_000)
-      .map((index) => context.base.nodes.getByIndex(index));
+    const nearby = context.baseView.nodesWithinRadius(
+      source.lon,
+      source.lat,
+      context.options.maxDistanceMeters,
+    );
     // A base ID also present in the patch is mutable under direct merge, so it is
     // not an immutable target for a different imported entity.
-    const targets = nearby.filter((target) => !context.patch.nodes.ids.has(target.id));
+    const targets = nearby.filter((target) => !context.provenance.isPatch("node", target.id));
     if (targets.length === 0) {
       candidates.push({
         id: candidateId("node", source.id, null),
@@ -759,25 +656,25 @@ function discoverNodeCandidates(context: DiscoveryContext) {
         sourceId: source.id,
         targetId: null,
         status: "unmatched",
-        reasons: [],
-        propertyTransfer: { status: "unmatched", reasons: [] },
-        networkAttachment: context.options.attachNetwork
-          ? { status: "unmatched", reasons: [] }
-          : null,
-        evidence: {
-          distanceMeters: Number.POSITIVE_INFINITY,
-          sourceRoutingFamilies: routingFamilies(patchWays),
-          targetRoutingFamilies: [],
-          tagDiff: [],
-        },
+        reasons: UNMATCHED.reasons,
+        propertyTransfer: UNMATCHED,
+        networkAttachment: context.options.attachNetwork ? UNMATCHED : null,
+        evidence: unmatchedEvidence(routingFamilies(patchWays)),
       });
       continue;
     }
 
     for (const target of targets.toSorted((a, b) => a.id - b.id)) {
-      const baseWays = context.baseWaysByNode.get(target.id) ?? [];
+      const baseWays = context.baseView.waysAtNode(target.id);
       const tagDiff = selectedTagDiff(source, target, context.options.propertyKeys);
-      const property = nodePropertyAssessment(context, patchWays, baseWays, tagDiff);
+      const property = nodePropertyAssessment(
+        context,
+        source,
+        target,
+        patchWays,
+        baseWays,
+        tagDiff,
+      );
       const attachment = nodeAttachmentAssessment(context, source, target, patchWays, baseWays);
       const typeConflicts = featureTypeConflicts(source.tags, target.tags);
       if (typeConflicts.length > 0) {
@@ -812,6 +709,9 @@ function discoverNodeCandidates(context: DiscoveryContext) {
           targetRoutingFamilies: routingFamilies(baseWays),
           tagDiff,
           featureTypeConflicts: typeConflicts.length > 0 ? typeConflicts : undefined,
+          ...(Object.keys(context.importedTags(source.tags) ?? {}).length > 0
+            ? { sourceTagged: true }
+            : {}),
           ...attachment.evidence,
         },
       });
@@ -845,16 +745,16 @@ function discoverWayCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
   if (context.options.propertyKeys.length === 0 && !context.options.allowWayRemoval)
     return candidates;
-  for (const source of context.patch.ways.sorted()) {
-    if (context.base.ways.ids.has(source.id)) continue;
+  for (const source of context.patchView.ways()) {
+    if (context.provenance.isBase("way", source.id)) continue;
     if (
       !context.options.allowWayRemoval &&
       !context.options.propertyKeys.some((key) => source.tags?.[key] != null)
     )
       continue;
-    const sourceCoordinates = wayCoordinates(context.patch, source);
+    const sourceCoordinates = context.patchView.wayCoordinates(source);
     if (sourceCoordinates.length < 2) continue;
-    const nearbyIndexes = context.base.ways.intersects(
+    const nearbyWays = context.baseView.waysIntersecting(
       lineBbox(sourceCoordinates, context.options.maxDistanceMeters),
     );
     const matches: {
@@ -869,10 +769,9 @@ function discoverWayCandidates(context: DiscoveryContext) {
         | "featureTypeConflicts"
       >;
     }[] = [];
-    for (const index of nearbyIndexes) {
-      const target = context.base.ways.getByIndex(index);
-      if (context.patch.ways.ids.has(target.id)) continue;
-      const targetCoordinates = wayCoordinates(context.base, target);
+    for (const target of nearbyWays) {
+      if (context.provenance.isPatch("way", target.id)) continue;
+      const targetCoordinates = context.baseView.wayCoordinates(target);
       if (targetCoordinates.length < 2) continue;
       const endpoints = endpointDistances(sourceCoordinates, targetCoordinates);
       if (Math.max(...endpoints.distances) > context.options.maxDistanceMeters) continue;
@@ -916,23 +815,17 @@ function discoverWayCandidates(context: DiscoveryContext) {
     if (matches.length === 0) {
       // Multiple nearby base ways may represent a segmented equivalent. This version
       // deliberately reports that case instead of guessing a one-to-many mapping.
-      const reasons: OsmConflationReasonCode[] =
-        nearbyIndexes.length > 1 ? ["unsupported-way-chain"] : [];
+      const assessment = nearbyWays.length > 1 ? UNMATCHED_CHAIN : UNMATCHED;
       candidates.push({
         id: candidateId("way", source.id, null),
         entityType: "way",
         sourceId: source.id,
         targetId: null,
         status: "unmatched",
-        reasons,
-        propertyTransfer: { status: "unmatched", reasons },
+        reasons: assessment.reasons,
+        propertyTransfer: assessment,
         networkAttachment: null,
-        evidence: {
-          distanceMeters: Number.POSITIVE_INFINITY,
-          sourceRoutingFamilies: [wayRoutingFamily(source)],
-          targetRoutingFamilies: [],
-          tagDiff: [],
-        },
+        evidence: unmatchedEvidence([wayRoutingFamily(source)]),
       });
       continue;
     }
@@ -978,23 +871,96 @@ function discoverWayCandidates(context: DiscoveryContext) {
   return candidates;
 }
 
-function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
-  // Candidate discovery is local to each source. Enforce the batch-wide one-to-one
-  // invariant only after all otherwise plausible pairs are known.
-  const sourcesByTarget = new Map<string, Set<number>>();
+function applyManyToOneClassification(
+  candidates: OsmConflationCandidate[],
+  sourceTags: (nodeId: number) => OsmTags | undefined,
+) {
+  // Candidate discovery is local to each source. Enforce the batch-wide invariants only after
+  // all otherwise plausible pairs are known. A point of a copy of the base path, with nothing
+  // else to do at the target, competes with nothing (MP-M1).
+  const byTarget = new Map<string, OsmConflationCandidate[]>();
   for (const candidate of candidates) {
-    if (candidate.targetId == null) continue;
+    if (candidate.targetId == null || tracesOnly(candidate)) continue;
     const key = `${candidate.entityType}:${candidate.targetId}`;
-    const sources = sourcesByTarget.get(key) ?? new Set();
-    sources.add(candidate.sourceId);
-    sourcesByTarget.set(key, sources);
+    byTarget.set(key, [...(byTarget.get(key) ?? []), candidate]);
   }
-  for (const candidate of candidates) {
-    if (candidate.targetId == null) continue;
-    if ((sourcesByTarget.get(`${candidate.entityType}:${candidate.targetId}`)?.size ?? 0) <= 1)
+  for (const group of byTarget.values()) {
+    if (group[0]!.entityType === "way") {
+      // One base way takes one imported way's copy or removal.
+      if (group.length > 1)
+        for (const candidate of group) addReviewReason(candidate, "many-to-one");
       continue;
-    addReviewReason(candidate, "many-to-one");
+    }
+    // Copies onto one base node are a choice between their values.
+    const copying = group.filter(({ propertyTransfer }) => actionable(propertyTransfer));
+    if (copying.length > 1) {
+      for (const candidate of copying) {
+        markReview(candidate, candidate.propertyTransfer, "many-to-one");
+      }
+    }
+    // Connections share the base node unless they conflict (MP-M5).
+    const connecting = group.filter(({ networkAttachment }) => actionable(networkAttachment));
+    for (const candidate of connecting) {
+      const rivals = connecting.flatMap((other): OsmConflationConnectionRival[] => {
+        if (other === candidate) return [];
+        const sharedWayId = sharedImportedWay(candidate, other);
+        const keys = conflictingTagKeys(sourceTags(candidate.sourceId), sourceTags(other.sourceId));
+        if (sharedWayId === null && keys.length === 0) return [];
+        return [
+          {
+            candidateId: other.id,
+            ...(sharedWayId === null ? {} : { sharedWayId }),
+            ...(keys.length === 0 ? {} : { conflictingKeys: keys }),
+          },
+        ];
+      });
+      if (rivals.length === 0) continue;
+      candidate.connectionRivals = rivals;
+      // Points of one way are a choice of the nearest; two values for one key are a person's.
+      if (rivals.some(({ sharedWayId }) => sharedWayId !== undefined)) {
+        markReview(candidate, candidate.networkAttachment, "many-to-one");
+      }
+      if (rivals.some(({ conflictingKeys }) => conflictingKeys !== undefined)) {
+        markReview(candidate, candidate.networkAttachment, "node-context-conflict");
+      }
+    }
   }
+}
+
+function actionable(assessment: OsmConflationActionAssessment | null) {
+  return assessment?.status === "automatic" || assessment?.status === "review";
+}
+
+/** Add a review reason to one action, and to the candidate as `addReviewReason` does. */
+function markReview(
+  candidate: OsmConflationCandidate,
+  assessment: OsmConflationActionAssessment | null,
+  reason: OsmConflationReasonCode,
+) {
+  if (!assessment) return;
+  if (assessment.status === "automatic") assessment.status = "review";
+  assessment.reasons = uniqueReasons([...assessment.reasons, reason]);
+  candidate.reasons = uniqueReasons([...candidate.reasons, reason]);
+  if (candidate.status === "automatic") candidate.status = "review";
+}
+
+/**
+ * The imported way two connections to one base node share, or null when they can both apply.
+ * Points of one way cannot both connect: that would collapse or loop the way (MP-M5). Points of
+ * different ways can: each connection alone already passed the junction's grade rule against
+ * every highway at the node, and no two that pass alone fail together
+ * (`test/connection-rivals.test.ts` checks this over small junctions).
+ */
+function sharedImportedWay(a: OsmConflationCandidate, b: OsmConflationCandidate) {
+  const bWays = new Set(b.evidence.patchWayIds ?? []);
+  return (a.evidence.patchWayIds ?? []).find((id) => bWays.has(id)) ?? null;
+}
+
+/** A candidate whose only action is a connection blocked as a copy of the base path. */
+function tracesOnly(candidate: OsmConflationCandidate) {
+  if (!candidate.networkAttachment?.reasons.includes("traces-base-way")) return false;
+  const transfer = candidate.propertyTransfer.status;
+  return transfer === "blocked" || transfer === "unmatched";
 }
 
 /** Discover fuzzy candidates strictly between untouched patch and immutable base inputs. */
@@ -1003,15 +969,49 @@ export function discoverConflationCandidates(
   patch: Osm,
   options: OsmConflationOptions,
 ): OsmConflationDiscovery {
+  return discoverOnViews(base, patch, osmDatasetView(base), osmDatasetView(patch), options);
+}
+
+/**
+ * @internal Discover candidates on a merge plan's state after its direct and identity phases.
+ * Imported entities those phases consumed are not sources; targets stay base entities.
+ */
+export function discoverPlannedConflationCandidates(
+  base: Osm,
+  planned: Osm,
+  overlay: PlanOverlay,
+  options: OsmConflationOptions,
+  /** The imported tags a connection may merge into base data (MP-X4). */
+  importedTags: ImportedTags = keepImportedTags,
+): OsmConflationDiscovery {
+  const { baseView, patchView } = plannedMatchingViews(
+    overlay,
+    base,
+    planned,
+    inputProvenance(base, planned),
+  );
+  return discoverOnViews(base, planned, baseView, patchView, options, importedTags);
+}
+
+function discoverOnViews(
+  base: Osm,
+  patch: Osm,
+  baseView: DatasetView,
+  patchView: DatasetView,
+  options: OsmConflationOptions,
+  importedTags: ImportedTags = keepImportedTags,
+): OsmConflationDiscovery {
   const resolved = resolvedOptions(options);
   const context: DiscoveryContext = {
     base,
     patch,
+    provenance: inputProvenance(base, patch),
     options: resolved,
-    baseWaysByNode: waysByNode(base),
-    patchWaysByNode: waysByNode(patch),
-    baseRelations: relationContext(base),
-    patchRelations: relationContext(patch),
+    baseView,
+    patchView,
+    baseRelations: baseView.relationMembership(),
+    patchRelations: patchView.relationMembership(),
+    importedTags,
   };
   const candidates = [
     ...discoverNodeCandidates(context),
@@ -1022,7 +1022,7 @@ export function discoverConflationCandidates(
       a.sourceId - b.sourceId ||
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
-  applyManyToOneClassification(candidates);
+  applyManyToOneClassification(candidates, (id) => importedTags(patchView.getNode(id)?.tags));
   const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
@@ -1091,43 +1091,13 @@ export function refreshConflationWayRemovalAssessments(
   discovery.summary = summarizeConflationCandidates(discovery.candidates);
 }
 
-/**
- * Discover canonical candidates for an in-process merge orchestrator.
- *
- * @internal This capability must stay inside a same-call merge path. Unlike the
- * public generation functions, its companion generators trust the object
- * identity registered here instead of rediscovering candidates from scratch.
- */
-export function discoverConflationCandidatesForTrustedMerge(
-  base: Osm,
-  patch: Osm,
-  options: OsmConflationOptions,
-) {
-  const discovery = discoverConflationCandidates(base, patch, options);
-  trustedDiscoveries.set(discovery, { base, patch });
-  trustedCandidateCollections.add(discovery.candidates);
-  return discovery;
-}
-
-function decisionMap(decisions: readonly OsmConflationDecision[]) {
-  return new Map(decisions.map((decision) => [decision.candidateId, decision]));
-}
-
 function validatedDecisionMap(
   candidates: readonly OsmConflationCandidate[],
   decisions: readonly OsmConflationDecision[],
 ) {
   if (!Array.isArray(decisions)) throw Error("Conflation decisions must be an array");
   if (decisions.length === 0) return new Map<string, OsmConflationDecision>();
-  let candidateIds = trustedCandidateIds.get(candidates);
-  if (!candidateIds) {
-    candidateIds = new Set(candidates.map((candidate) => candidate.id));
-    // General callers may mutate their candidate arrays between validations.
-    // Cache IDs only for canonical collections retained by a trusted merge path.
-    if (trustedCandidateCollections.has(candidates)) {
-      trustedCandidateIds.set(candidates, candidateIds);
-    }
-  }
+  const candidateIds = new Set(candidates.map((candidate) => candidate.id));
   const result = new Map<string, OsmConflationDecision>();
   for (const decision of decisions) {
     if (decision == null || typeof decision !== "object") {
@@ -1159,83 +1129,6 @@ function validatedDecisionMap(
   return result;
 }
 
-/** Validate a complete effective decision set without mutating candidates or decisions. */
-export function validateConflationDecisions(
-  candidates: readonly OsmConflationCandidate[],
-  decisions: readonly OsmConflationDecision[],
-) {
-  const decisionsById = validatedDecisionMap(candidates, decisions);
-  validateAcceptedMappings(candidates, decisionsById);
-}
-
-/**
- * Restore a retained review for correction, including legacy source conflicts.
- * This internal recovery capability never authorizes generation or application.
- * Candidate IDs, decision structure, and every target-collision guard remain strict.
- * @internal
- */
-export function validateRetainedConflationReview(
-  candidates: readonly OsmConflationCandidate[],
-  decisions: readonly OsmConflationDecision[],
-) {
-  const decisionsById = validatedDecisionMap(candidates, decisions);
-  const retainedSourceConflicts = findPreservedSourceConflicts(candidates, decisionsById);
-  validateAcceptedMappings(candidates, decisionsById, retainedSourceConflicts);
-}
-
-/**
- * Replace one imported feature's target choice using the complete discovery and decision snapshot.
- * Sibling targets are explicitly rejected so their automatic defaults cannot become scheduled.
- * A null selection skips every target for this source. Existing unrelated source conflicts are
- * preserved so legacy reviews can be corrected one feature at a time. This cannot introduce new
- * source conflicts or bypass target-collision guards; generation still requires a fully valid set.
- */
-export function buildConflationSourceDecision(
-  candidates: readonly OsmConflationCandidate[],
-  decisions: readonly OsmConflationDecision[],
-  source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
-  selected: OsmConflationDecision | null,
-): OsmConflationDecision[] {
-  const currentById = validatedDecisionMap(candidates, decisions);
-  if (
-    source == null ||
-    (source.entityType !== "node" && source.entityType !== "way") ||
-    !Number.isSafeInteger(source.sourceId)
-  ) {
-    throw Error("A valid imported entity type and ID are required");
-  }
-  const alternatives = candidates.filter(
-    (candidate) =>
-      candidate.entityType === source.entityType && candidate.sourceId === source.sourceId,
-  );
-  if (alternatives.length === 0) {
-    throw Error(`No conflation candidates for imported ${source.entityType} ${source.sourceId}`);
-  }
-  if (selected !== null) {
-    validatedDecisionMap(candidates, [selected]);
-    if (!alternatives.some((candidate) => candidate.id === selected.candidateId)) {
-      throw Error(
-        `Candidate ${selected.candidateId} does not match imported ${source.entityType} ${source.sourceId}`,
-      );
-    }
-  }
-  const preservedSourceConflicts = findPreservedSourceConflicts(candidates, currentById, source);
-  const nextById = new Map(currentById);
-  for (const candidate of alternatives) {
-    nextById.set(
-      candidate.id,
-      selected?.candidateId === candidate.id
-        ? { ...selected }
-        : { candidateId: candidate.id, action: "reject" },
-    );
-  }
-  const next = [...nextById.values()]
-    .map((decision) => ({ ...decision }))
-    .toSorted((a, b) => a.candidateId.localeCompare(b.candidateId));
-  validateAcceptedMappings(candidates, nextById, preservedSourceConflicts);
-  return next;
-}
-
 function effectiveStatusForDecision(
   candidate: OsmConflationCandidate,
   decision: OsmConflationDecision | undefined,
@@ -1260,17 +1153,6 @@ function effectiveStatusForDecision(
   return candidate.status;
 }
 
-/** Return a candidate's applicable decision status without rerunning spatial discovery. */
-export function conflationEffectiveStatus(
-  candidate: OsmConflationCandidate,
-  decisions: readonly OsmConflationDecision[] = [],
-): OsmConflationEffectiveStatus {
-  return effectiveStatusForDecision(
-    candidate,
-    decisions.findLast((decision) => decision.candidateId === candidate.id),
-  );
-}
-
 /** Recompute review counts after lightweight decisions without rerunning discovery. */
 export function summarizeConflationCandidates(
   candidates: readonly OsmConflationCandidate[],
@@ -1293,169 +1175,12 @@ export function summarizeConflationCandidates(
   return summary;
 }
 
-/** Filter candidate rows deterministically, including effective rejected status. */
-export function filterConflationCandidates(
-  candidates: readonly OsmConflationCandidate[],
-  filter: OsmConflationCandidateFilter,
-  decisions: readonly OsmConflationDecision[] = [],
+function currentEntity<T extends "node" | "way" | "relation">(
+  changeset: OsmChangeset,
+  type: T,
+  id: number,
 ) {
-  const decisionsById = decisionMap(decisions);
-  return candidates.filter((candidate) => {
-    if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
-    const status = effectiveStatusForDecision(candidate, decisionsById.get(candidate.id));
-    if (filter.status != null && status !== filter.status) {
-      return false;
-    }
-    if (filter.reason != null && !candidate.reasons.includes(filter.reason)) return false;
-    if (filter.sourceId != null && candidate.sourceId !== filter.sourceId) return false;
-    if ("targetId" in filter && candidate.targetId !== filter.targetId) return false;
-    return true;
-  });
-}
-
-const BULK_AMBIGUITY_REASONS = new Set<OsmConflationReasonCode>([
-  "many-to-one",
-  "multiple-targets",
-  "unsupported-way-chain",
-]);
-
-function bulkActionAssessment(
-  candidate: OsmConflationCandidate,
-  action: OsmConflationBulkDecisionRequest["action"],
-) {
-  if (action === "transfer-properties") return candidate.propertyTransfer;
-  if (action === "attach-network") return candidate.networkAttachment;
-  return null;
-}
-
-function bulkActionEligible(
-  candidate: OsmConflationCandidate,
-  action: OsmConflationBulkDecisionRequest["action"],
-) {
-  if (action === "reject") return true;
-  if (candidate.status === "blocked" || candidate.status === "unmatched") return false;
-  if (candidate.targetId == null) return false;
-  if (candidate.reasons.some((reason) => BULK_AMBIGUITY_REASONS.has(reason))) return false;
-  const assessment = bulkActionAssessment(candidate, action);
-  if (!assessment || assessment.status === "blocked" || assessment.status === "unmatched") {
-    return false;
-  }
-  return action !== "transfer-properties" || candidate.evidence.tagDiff.length > 0;
-}
-
-/** Change one action while preserving the other currently scheduled choice. */
-export function buildConflationActionDecision(
-  candidate: OsmConflationCandidate,
-  current: OsmConflationDecision | undefined,
-  action: Exclude<OsmConflationBulkDecisionRequest["action"], "reject"> | "remove-way",
-  selected: boolean,
-): OsmConflationDecision {
-  const actions = resolveConflationActions(candidate, current);
-  return {
-    candidateId: candidate.id,
-    action: "accept",
-    transferProperties: action === "transfer-properties" ? selected : actions.transferProperties,
-    // Preserve an implicit automatic connection without turning a copy/removal
-    // choice into the explicit connection approval required by way removal.
-    attachNetwork:
-      action === "attach-network"
-        ? selected
-        : actions.attachNetwork
-          ? current?.action === "accept" && current.attachNetwork === true
-            ? true
-            : undefined
-          : false,
-    ...(action === "remove-way"
-      ? { removeWay: selected }
-      : current?.action === "accept" && current.removeWay !== undefined
-        ? { removeWay: current.removeWay }
-        : {}),
-  };
-}
-
-function decisionsHaveSameEffect(
-  candidate: OsmConflationCandidate,
-  current: OsmConflationDecision | undefined,
-  next: OsmConflationDecision,
-) {
-  if (!current || current.action !== next.action) return false;
-  if (current.action === "reject") return true;
-  const currentActions = resolveConflationActions(candidate, current);
-  const nextActions = resolveConflationActions(candidate, next);
-  return (
-    currentActions.transferProperties === nextActions.transferProperties &&
-    currentActions.attachNetwork === nextActions.attachNetwork &&
-    !!currentActions.removeWay === !!nextActions.removeWay &&
-    (current.attachNetwork === true) === (next.attachNetwork === true)
-  );
-}
-
-/** Build one atomic decision update for every candidate matching a filter. */
-export function buildConflationBulkDecisionResult(
-  candidates: readonly OsmConflationCandidate[],
-  decisions: readonly OsmConflationDecision[],
-  request: OsmConflationBulkDecisionRequest,
-): OsmConflationBulkDecisionResult {
-  if (request == null || typeof request !== "object") {
-    throw Error("Conflation bulk decision request must be an object");
-  }
-  if (!new Set(["transfer-properties", "attach-network", "reject"]).has(request.action)) {
-    throw Error(`Invalid conflation bulk action: ${String(request.action)}`);
-  }
-  if (request.filter == null || typeof request.filter !== "object") {
-    throw Error("Conflation bulk decision filter must be an object");
-  }
-
-  const currentById = validatedDecisionMap(candidates, decisions);
-  validateAcceptedMappings(candidates, currentById);
-  const nextById = new Map(currentById);
-  const filtered = filterConflationCandidates(candidates, request.filter, decisions);
-  let eligibleCandidates = 0;
-  let changedCandidates = 0;
-  let automaticCandidates = 0;
-  let reviewCandidates = 0;
-  let overriddenDecisions = 0;
-
-  for (const candidate of filtered) {
-    if (!bulkActionEligible(candidate, request.action)) continue;
-    eligibleCandidates++;
-    if (candidate.status === "automatic") automaticCandidates++;
-    if (candidate.status === "review") reviewCandidates++;
-
-    const current = currentById.get(candidate.id);
-    const next =
-      request.action === "reject"
-        ? ({ candidateId: candidate.id, action: "reject" } as const)
-        : buildConflationActionDecision(candidate, current, request.action, true);
-    if (decisionsHaveSameEffect(candidate, current, next)) continue;
-    changedCandidates++;
-    if (current) overriddenDecisions++;
-    nextById.set(candidate.id, next);
-  }
-
-  const nextDecisions = [...nextById.values()].toSorted((a, b) =>
-    a.candidateId.localeCompare(b.candidateId),
-  );
-  validateConflationDecisions(candidates, nextDecisions);
-  const preview = {
-    action: request.action,
-    filteredCandidates: filtered.length,
-    eligibleCandidates,
-    changedCandidates,
-    skippedCandidates: filtered.length - eligibleCandidates,
-    automaticCandidates,
-    reviewCandidates,
-    overriddenDecisions,
-  };
-  return {
-    decisions: nextDecisions,
-    preview,
-    summary: summarizeConflationCandidates(candidates, nextDecisions),
-  };
-}
-
-function currentEntity<T extends "node" | "way">(changeset: OsmChangeset, type: T, id: number) {
-  const change = changeset.changes(type)[id];
+  const change = changeset.changes(type).get(id);
   if (change?.changeType === "delete") return null;
   return change?.entity ?? changeset.getEntity(type, id) ?? null;
 }
@@ -1517,30 +1242,6 @@ function transferSelectedProperties(
   });
 }
 
-/** Identify existing source conflicts for scoped correction or retained-review restoration. */
-function findPreservedSourceConflicts(
-  candidates: readonly OsmConflationCandidate[],
-  decisions: ReadonlyMap<string, OsmConflationDecision>,
-  changedSource?: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
-) {
-  const scheduledSources = new Set<string>();
-  const preservedConflicts = new Set<string>();
-  for (const candidate of candidates) {
-    if (
-      changedSource &&
-      candidate.entityType === changedSource.entityType &&
-      candidate.sourceId === changedSource.sourceId
-    )
-      continue;
-    const actions = resolveConflationActions(candidate, decisions.get(candidate.id));
-    if (!actions.transferProperties && !actions.attachNetwork && !actions.removeWay) continue;
-    const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
-    if (scheduledSources.has(sourceKey)) preservedConflicts.add(sourceKey);
-    scheduledSources.add(sourceKey);
-  }
-  return preservedConflicts;
-}
-
 function findDecisionConflict(
   candidates: readonly OsmConflationCandidate[],
   decisions: ReadonlyMap<string, OsmConflationDecision>,
@@ -1583,7 +1284,7 @@ function validateAcceptedMappings(
 ) {
   const conflict = findDecisionConflict(candidates, decisions, preservedSourceConflicts);
   if (conflict) throw Object.assign(Error(conflict.message), { conflict });
-  const attachmentTargets = new Set<number>();
+  const attached = new Set<string>();
   const wayTargets = new Set<number>();
   for (const candidate of candidates) {
     const decision = decisions.get(candidate.id);
@@ -1596,10 +1297,16 @@ function validateAcceptedMappings(
     if (candidate.targetId == null)
       throw Error(`Conflation accepted unmatched candidate ${candidate.id}`);
     if (attach) {
-      if (attachmentTargets.has(candidate.targetId)) {
-        throw Error(`Conflation accepted multiple node attachments to ${candidate.targetId}`);
+      // A base node takes several connections, but never two that conflict (MP-M5).
+      const rival = candidate.connectionRivals?.find(({ candidateId }) =>
+        attached.has(candidateId),
+      );
+      if (rival) {
+        throw Error(
+          `Conflation accepted connections ${rival.candidateId} and ${candidate.id} that cannot share base node ${candidate.targetId}`,
+        );
       }
-      attachmentTargets.add(candidate.targetId);
+      attached.add(candidate.id);
     }
     if (candidate.entityType === "way" && (transfer || removeWay)) {
       if (wayTargets.has(candidate.targetId)) {
@@ -1611,12 +1318,56 @@ function validateAcceptedMappings(
 }
 
 /** Cancel a pending import or delete an entity already present in the application baseline. */
-function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
+export function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
   const type = "refs" in entity ? "way" : "node";
-  const wasCreated = changeset.changes(type)[entity.id]?.changeType === "create";
-  // Use delete to invalidate geometry/incidence caches before cancelling a create.
-  changeset.delete(entity);
-  if (wasCreated) delete changeset.changes(type)[entity.id];
+  // A pending import is dropped (a journaled tombstone); anything else is deleted.
+  if (changeset.changes(type).get(entity.id)?.changeType === "create") {
+    changeset.overlay.discard(type, entity.id);
+  } else changeset.delete(entity);
+}
+
+/**
+ * Drop each connected imported node the rewrite left unused (MP-M2): referenced by no remaining
+ * way or relation. Its tags were merged into the base point, so no value is lost.
+ */
+function removeConnectionOrphans(
+  changeset: OsmChangeset,
+  base: Osm,
+  patch: Osm,
+  attachments: ReadonlyMap<number, number>,
+  trace: ConflationApplicationTrace,
+) {
+  if (attachments.size === 0) return;
+  const provenance = inputProvenance(base, patch);
+  const relationNodeMembers = new Set<number>();
+  for (const patchRelation of patch.relations) {
+    const relation = currentEntity(changeset, "relation", patchRelation.id);
+    for (const member of relation?.members ?? [])
+      if (member.type === "node") relationNodeMembers.add(member.ref);
+  }
+  const patchWaysByNode = new Map<number, number[]>();
+  for (const way of patch.ways)
+    for (const ref of new Set(way.refs))
+      if (attachments.has(ref))
+        patchWaysByNode.set(ref, [...(patchWaysByNode.get(ref) ?? []), way.id]);
+  for (const sourceId of attachments.keys()) {
+    const node = currentEntity(changeset, "node", sourceId);
+    // Only patch ways can reference an imported node; check their current refs.
+    const byWay = (patchWaysByNode.get(sourceId) ?? []).some((wayId) =>
+      currentEntity(changeset, "way", wayId)?.refs.includes(sourceId),
+    );
+    if (!node) continue;
+    const droppable = canDropReplacedNode({
+      imported: provenance.isImported("node", sourceId),
+      tagged: Object.keys(node.tags ?? {}).length > 0,
+      tagsMerged: true,
+      referencedByWay: byWay,
+      referencedByRelation: relationNodeMembers.has(sourceId),
+    });
+    if (!droppable) continue;
+    removeImportedEntity(changeset, node);
+    trace.connectionOrphanNodeIds.add(sourceId);
+  }
 }
 
 function applyDiscoveredConflation(
@@ -1636,6 +1387,7 @@ function applyDiscoveredConflation(
   const trace: ConflationApplicationTrace = {
     tagWriters: new Map(),
     alreadyEqualTagValues: new Set(),
+    connectionOrphanNodeIds: new Set(),
   };
   const attachments = new Map<number, number>();
   const patchWayIds = new Set<number>();
@@ -1656,13 +1408,27 @@ function applyDiscoveredConflation(
     const way = currentEntity(changeset, "way", wayId);
     if (!way) continue;
     const refs = way.refs.map((ref) => attachments.get(ref) ?? ref);
-    if (refs.some((ref, index) => index > 0 && ref === refs[index - 1])) {
+    if (hasAdjacentDuplicateRefs(refs)) {
       throw Error(`Conflation attachment would create duplicate adjacent refs in way ${wayId}`);
     }
-    if (way.tags?.["highway"] != null && new Set(refs).size < 2) {
+    if (way.tags?.["highway"] != null && hasTooFewDistinctRefs(refs)) {
       throw Error(`Conflation attachment would collapse highway way ${wayId}`);
     }
     changeset.modify("way", wayId, (current) => ({ ...current, refs }));
+  }
+  // Relation node members follow the connection (restrictions were checked in discovery).
+  for (const patchRelation of patch.relations) {
+    const relation = currentEntity(changeset, "relation", patchRelation.id);
+    if (!relation?.members.some((member) => member.type === "node" && attachments.has(member.ref)))
+      continue;
+    changeset.modify("relation", relation.id, (current) => ({
+      ...current,
+      members: current.members.map((member) =>
+        member.type === "node" && attachments.has(member.ref)
+          ? { ...member, ref: attachments.get(member.ref)! }
+          : member,
+      ),
+    }));
   }
 
   for (const candidate of discovery.candidates) {
@@ -1681,15 +1447,31 @@ function applyDiscoveredConflation(
       throw Error(`Conflation source ${candidate.entityType} ${candidate.sourceId} is missing`);
     transferSelectedProperties(changeset, candidate, source, trace);
   }
+  // Each connected point's tags merge into its base point, after any copy: the imported values
+  // win (MP-M3), and the outcome credits the values the connection writes to its candidate.
+  for (const candidate of discovery.candidates) {
+    if (candidate.targetId == null || attachments.get(candidate.sourceId) !== candidate.targetId)
+      continue;
+    const tags = changeset.importedTags(currentEntity(changeset, "node", candidate.sourceId)?.tags);
+    if (!tags || Object.keys(tags).length === 0) continue;
+    changeset.modify("node", candidate.targetId, (target) => {
+      for (const [key, value] of Object.entries(tags)) {
+        if (target.tags?.[key] !== value)
+          trace.tagWriters.set(conflationTagTargetKey(candidate, key), candidate.id);
+      }
+      return { ...target, tags: mergeImportedTags(target.tags, tags) };
+    });
+  }
   const selectedRemovals = discovery.candidates.filter(
     (candidate) =>
       decisionsById.get(candidate.id)?.action === "accept" &&
       decisionsById.get(candidate.id)?.removeWay === true,
   );
   if (selectedRemovals.length) {
-    // Recheck the actual ordinary merge plus all accepted copy/connection changes.
-    // Validate every plan before deleting anything, so dependent removals cannot bypass checks.
-    const current = applyChangesetToOsm(changeset);
+    // Recheck the current state: the ordinary merge plus all accepted copy/connection
+    // changes. Validate every removal before deleting anything, so dependent removals cannot
+    // bypass checks.
+    const current = changeset.overlay.reader();
     const assessments = assessWayRemovals(
       originalBase,
       patch,
@@ -1718,239 +1500,37 @@ function applyDiscoveredConflation(
       trace.wayRemovals.set(candidate.id, preview);
     }
   }
+  // Last, so removal checks see the imported geometry they were reviewed against.
+  removeConnectionOrphans(changeset, originalBase, patch, attachments, trace);
   return trace;
 }
 
-function generateConflationApplicationArtifacts(
-  baseline: Osm,
-  patch: Osm,
-  canonicalDiscovery: OsmConflationDiscovery,
-  originalBase: Osm,
-  decisions: readonly OsmConflationDecision[] = [],
+/**
+ * @internal Apply matching decisions to a merge plan's changes, in place, and report what
+ * they did against the plan's state before matching.
+ */
+export function applyPlannedConflation(
+  changeset: OsmChangeset,
+  base: Osm,
+  planned: Osm,
+  discovery: OsmConflationDiscovery,
+  decisions: readonly OsmConflationDecision[],
+  /** The planned state now, read by ID while matching writes; otherwise a copy is taken. */
+  current?: EarlierState,
 ) {
-  if (patch.id !== canonicalDiscovery.patchOsmId) {
-    throw Error(
-      `Conflation discovery patch ${canonicalDiscovery.patchOsmId} does not match ${patch.id}`,
-    );
-  }
-  if (originalBase.id !== canonicalDiscovery.baseOsmId) {
-    throw Error(
-      `Conflation discovery base ${canonicalDiscovery.baseOsmId} does not match ${originalBase.id}`,
-    );
-  }
-  const changeset = new OsmChangeset(baseline);
-  const trace = applyDiscoveredConflation(
-    changeset,
-    originalBase,
-    patch,
-    canonicalDiscovery,
-    decisions,
-  );
-  const result = applyChangesetToOsm(changeset);
-  assertConflationPreservesBaseTopology(originalBase, baseline, result);
-  const outcome = createConflationOutcomeReport(
-    originalBase,
-    patch,
-    baseline,
-    result,
-    canonicalDiscovery,
+  const earlier = current ?? snapshotState(changeset.overlay.snapshot(), changeset.overlay);
+  const before = earlierStateReader(earlier, changeset.osm.id);
+  const trace = applyDiscoveredConflation(changeset, base, planned, discovery, decisions);
+  const after = changeset.overlay.reader();
+  assertConflationPreservesBaseTopology(base, earlier, changeset.overlay);
+  return createConflationOutcomeReport(
+    base,
+    planned,
+    before,
+    after,
+    discovery,
     decisions,
     trace,
     resolveConflationActions,
-  );
-  return { changeset, ordinaryBaseline: baseline, result, outcome };
-}
-
-/** Generate fuzzy-only changes over an already applied ordinary direct/exact merge baseline. */
-export function generateConflationApplicationChangeset(
-  baseline: Osm,
-  patch: Osm,
-  discovery: OsmConflationDiscovery,
-  originalBase: Osm,
-  decisions: readonly OsmConflationDecision[] = [],
-) {
-  // Reject review data from another merge session before rediscovery. The
-  // candidate evidence is deliberately untrusted, but its input IDs are still
-  // part of the public API's stale-session guard.
-  if (patch.id !== discovery.patchOsmId) {
-    throw Error(`Conflation discovery patch ${discovery.patchOsmId} does not match ${patch.id}`);
-  }
-  if (originalBase.id !== discovery.baseOsmId) {
-    throw Error(
-      `Conflation discovery base ${discovery.baseOsmId} does not match ${originalBase.id}`,
-    );
-  }
-  // Recompute from untouched entities before applying. Candidate records returned
-  // to callers are review data, not trusted instructions for mutating topology.
-  const canonicalDiscovery = discoverConflationCandidates(originalBase, patch, discovery.options);
-  return generateConflationApplicationArtifacts(
-    baseline,
-    patch,
-    canonicalDiscovery,
-    originalBase,
-    decisions,
-  ).changeset;
-}
-
-function validateCumulativeConflationOptions(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  discovery: OsmConflationDiscovery,
-) {
-  if (!options.conflation) throw Error("generateConflationChangeset requires conflation options");
-  if (!options.directMerge)
-    throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
-  if (options.createIntersections) {
-    throw Error(
-      "generateConflationChangeset cannot create intersections in the cumulative changeset",
-    );
-  }
-  if (discovery.baseOsmId !== base.id || discovery.patchOsmId !== patch.id) {
-    throw Error("Conflation discovery does not match the untouched merge inputs");
-  }
-  const expectedOptions = resolvedOptions(options.conflation);
-  if (
-    discovery.options.attachNetwork !== expectedOptions.attachNetwork ||
-    !!discovery.options.allowWayRemoval !== !!expectedOptions.allowWayRemoval ||
-    discovery.options.automatic !== expectedOptions.automatic ||
-    discovery.options.maxDistanceMeters !== expectedOptions.maxDistanceMeters ||
-    discovery.options.propertyKeys.length !== expectedOptions.propertyKeys.length ||
-    discovery.options.propertyKeys.some((key, index) => key !== expectedOptions.propertyKeys[index])
-  ) {
-    throw Error("Conflation discovery options do not match generation options");
-  }
-}
-
-function generateCumulativeConflationArtifacts(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  decisions: readonly OsmConflationDecision[],
-  canonicalDiscovery: OsmConflationDiscovery,
-  onProgress?: (progress: ProgressEvent) => void,
-) {
-  validateCumulativeConflationOptions(base, patch, options, canonicalDiscovery);
-  refreshConflationWayRemovalAssessments(base, patch, canonicalDiscovery, decisions, true);
-  validateConflationDecisions(canonicalDiscovery.candidates, decisions);
-  const ordinaryOptions = {
-    directMerge: true,
-    deduplicateNodes: options.deduplicateNodes ?? false,
-    deduplicateWays: options.deduplicateWays ?? false,
-    createIntersections: false,
-  };
-  // Applying does not consume a changeset. Build the ordinary changes once, use
-  // them to materialize the comparison baseline, then add fuzzy changes to that
-  // same cumulative changeset.
-  const changeset = onProgress
-    ? generateChangeset(base, patch, ordinaryOptions, onProgress)
-    : generateChangeset(base, patch, ordinaryOptions);
-  const ordinaryBaseline = applyChangesetToOsm(changeset);
-  const trace = applyDiscoveredConflation(changeset, base, patch, canonicalDiscovery, decisions);
-  const result = applyChangesetToOsm(changeset);
-  assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
-  const outcome = createConflationOutcomeReport(
-    base,
-    patch,
-    ordinaryBaseline,
-    result,
-    canonicalDiscovery,
-    decisions,
-    trace,
-    resolveConflationActions,
-  );
-  return { changeset, ordinaryBaseline, result, outcome };
-}
-
-/**
- * Generate cumulative changes, ordinary/final datasets, and a detached matching outcome report.
- * Intersection creation remains a later stage because newly created ways are not indexed yet.
- */
-export function generateConflationArtifacts(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  decisions: readonly OsmConflationDecision[] = options.conflation?.decisions ?? [],
-  discovery?: OsmConflationDiscovery,
-): OsmConflationArtifacts {
-  if (!options.conflation) throw Error("generateConflationChangeset requires conflation options");
-  if (!options.directMerge)
-    throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
-  if (options.createIntersections) {
-    throw Error(
-      "generateConflationChangeset cannot create intersections in the cumulative changeset",
-    );
-  }
-  // Generation never trusts possibly stale or caller-mutated candidate evidence.
-  // Stable decisions are replayed against a fresh discovery from untouched inputs.
-  const canonicalDiscovery = discoverConflationCandidates(base, patch, options.conflation);
-  const suppliedDiscovery = discovery ?? canonicalDiscovery;
-  // Validate the supplied review snapshot even though the fresh canonical
-  // discovery remains the only source of mutation instructions.
-  validateCumulativeConflationOptions(base, patch, options, suppliedDiscovery);
-  return generateCumulativeConflationArtifacts(base, patch, options, decisions, canonicalDiscovery);
-}
-
-/** Generate a cumulative changeset; use generateConflationArtifacts for actual outcome details. */
-export function generateConflationChangeset(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  decisions: readonly OsmConflationDecision[] = options.conflation?.decisions ?? [],
-  discovery?: OsmConflationDiscovery,
-): OsmChangeset {
-  return generateConflationArtifacts(base, patch, options, decisions, discovery).changeset;
-}
-
-/**
- * Generate cumulative artifacts from a canonical same-process discovery.
- *
- * @internal Public generation must use {@link generateConflationChangeset}, which
- * deliberately rediscovers candidates before applying caller-supplied decisions.
- */
-export function generateConflationArtifactsFromTrustedDiscovery(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  decisions: readonly OsmConflationDecision[],
-  discovery: OsmConflationDiscovery,
-  onProgress: (progress: ProgressEvent) => void,
-) {
-  const inputs = trustedDiscoveries.get(discovery);
-  if (inputs?.base !== base || inputs.patch !== patch) {
-    throw Error("Conflation discovery is not owned by this trusted merge session");
-  }
-  return generateCumulativeConflationArtifacts(
-    base,
-    patch,
-    options,
-    decisions,
-    discovery,
-    onProgress,
-  );
-}
-
-/**
- * Generate fuzzy-only artifacts from a canonical same-process discovery.
- *
- * @internal Used for the automatic network-attachment CAR safety projection.
- */
-export function generateConflationApplicationArtifactsFromTrustedDiscovery(
-  baseline: Osm,
-  patch: Osm,
-  discovery: OsmConflationDiscovery,
-  originalBase: Osm,
-  decisions: readonly OsmConflationDecision[],
-) {
-  const inputs = trustedDiscoveries.get(discovery);
-  if (inputs?.base !== originalBase || inputs.patch !== patch) {
-    throw Error("Conflation discovery is not owned by this trusted merge session");
-  }
-  return generateConflationApplicationArtifacts(
-    baseline,
-    patch,
-    discovery,
-    originalBase,
-    decisions,
   );
 }

@@ -32,7 +32,7 @@ console.log(pbfBuffer.byteLength);
 
 ### Displaying in a browser (manual Blob URL)
 
-Most viewers expect tile URLs. To see a Maplibre implementation in the [example merge app](/apps/merge/src/lib/osmix-vector-protocol.ts).
+Most viewers expect tile URLs. To see a Maplibre implementation in the [Osmix app](/packages/app-components/src/lib/osmix-vector-protocol.ts).
 
 ## What gets encoded
 

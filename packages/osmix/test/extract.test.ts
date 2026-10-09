@@ -457,6 +457,162 @@ describe("extract", () => {
     expect(complete.nodes.ids.has(2)).toBe(false);
   });
 
+  test("turn restrictions are never extracted with members removed", () => {
+    const osm = new Osm({ id: "restrictions" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 0.5 }); // inside
+    osm.nodes.addNode({ id: 3, lat: 0, lon: 2 }); // outside
+    osm.nodes.addNode({ id: 4, lat: 0, lon: 3 }); // outside
+    osm.nodes.addNode({ id: 5, lat: 0.5, lon: 0.5 }); // inside
+    osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "residential" } });
+    osm.ways.addWay({ id: 11, refs: [2, 3], tags: { highway: "residential" } });
+    osm.ways.addWay({ id: 12, refs: [3, 4], tags: { highway: "residential" } }); // outside
+    osm.ways.addWay({ id: 13, refs: [2, 5], tags: { highway: "residential" } });
+    const tags = { type: "restriction", restriction: "no_left_turn" };
+    // `to` way lies outside the bbox.
+    osm.relations.addRelation({
+      id: 500,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "way", ref: 11, role: "via" },
+        { type: "way", ref: 12, role: "to" },
+      ],
+      tags,
+    });
+    // Entirely inside the bbox.
+    osm.relations.addRelation({
+      id: 501,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "node", ref: 2, role: "via" },
+        { type: "way", ref: 13, role: "to" },
+      ],
+      tags,
+    });
+    // `to` way is missing from the source.
+    osm.relations.addRelation({
+      id: 502,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "node", ref: 2, role: "via" },
+        { type: "way", ref: 999, role: "to" },
+      ],
+      tags,
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    for (const strategy of ["simple", "complete_ways"] as const) {
+      const extracted = createExtract(osm, TEST_BBOX, strategy, () => {});
+      expect(Array.from(extracted.relations.ids.sorted)).toEqual([501]);
+      expect(extracted.relations.getById(501)?.members).toHaveLength(3);
+    }
+
+    const smart = createExtract(osm, TEST_BBOX, "smart", () => {});
+    expect(Array.from(smart.relations.ids.sorted)).toEqual([500, 501]);
+    expect(smart.relations.getById(500)?.members.map((m) => m.ref)).toEqual([10, 11, 12]);
+    expect(smart.ways.ids.has(12)).toBe(true);
+    expect(smart.nodes.ids.has(4)).toBe(true);
+  });
+
+  test("complete_ways does not chain ways through outside nodes of other ways", () => {
+    const osm = new Osm({ id: "chain" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }); // outside
+    osm.nodes.addNode({ id: 3, lat: 0, lon: 3 }); // outside
+    osm.ways.addWay({ id: 5, refs: [2, 3] }); // touches only node 2, lower ID than way 10
+    osm.ways.addWay({ id: 10, refs: [1, 2] }); // crosses the bbox
+    osm.ways.addWay({ id: 20, refs: [2, 3] }); // touches only node 2, higher ID than way 10
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    for (const strategy of ["complete_ways", "smart"] as const) {
+      const extracted = createExtract(osm, TEST_BBOX, strategy);
+      expect(Array.from(extracted.ways.ids.sorted)).toEqual([10]);
+      expect(Array.from(extracted.nodes.ids.sorted)).toEqual([1, 2]);
+    }
+  });
+
+  test("extract output is in ascending ID order", () => {
+    const osm = new Osm({ id: "unsorted" });
+    // Add in descending ID order so source index order differs from ID order.
+    for (const id of [9, 7, 5, 3, 1]) osm.nodes.addNode({ id, lat: 0.1 * id, lon: 0.1 * id });
+    osm.nodes.addNode({ id: 100, lat: 0, lon: 5 }); // outside, completes way 30
+    osm.ways.addWay({ id: 40, refs: [1, 3] });
+    osm.ways.addWay({ id: 30, refs: [5, 100] });
+    osm.ways.addWay({ id: 20, refs: [7, 9] });
+    osm.relations.addRelation({ id: 60, members: [{ type: "way", ref: 20, role: "" }] });
+    osm.relations.addRelation({ id: 50, members: [{ type: "node", ref: 1, role: "" }] });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    for (const strategy of ["simple", "complete_ways", "smart"] as const) {
+      const extracted = createExtract(osm, TEST_BBOX, strategy);
+      for (const entities of [extracted.nodes, extracted.ways, extracted.relations]) {
+        const ids = Array.from({ length: entities.size }, (_, i) => entities.ids.at(i));
+        expect(ids).toEqual([...ids].sort((a, b) => a - b));
+      }
+      expect(extracted.ways.size).toBe(3);
+      expect(extracted.relations.size).toBe(2);
+    }
+  });
+
+  test("smart strategy emits a relation nested in a multipolygon once, reference complete", () => {
+    const osm = new Osm({ id: "nested-duplicate" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }); // outside
+    osm.nodes.addNode({ id: 3, lat: 0.2, lon: 2.2 }); // outside, only a member of relation 60
+    osm.ways.addWay({ id: 10, refs: [1, 2] });
+    osm.relations.addRelation({
+      id: 50,
+      members: [{ type: "relation", ref: 60, role: "part" }],
+      tags: { type: "multipolygon" },
+    });
+    osm.relations.addRelation({
+      id: 60,
+      members: [
+        { type: "way", ref: 10, role: "outer" },
+        { type: "node", ref: 3, role: "label" },
+      ],
+      tags: { type: "site" },
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    const smart = createExtract(osm, TEST_BBOX, "smart");
+
+    expect(Array.from(smart.relations.ids.sorted)).toEqual([50, 60]);
+    expect(smart.relations.getById(60)?.members).toHaveLength(2);
+    expect(smart.nodes.ids.has(3)).toBe(true);
+  });
+
+  test("smart strategy skips multipolygon members missing from the source", () => {
+    const osm = new Osm({ id: "regional" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }); // outside
+    osm.ways.addWay({ id: 10, refs: [1, 2] });
+    // A boundary cut by a regional file: way 99 and node 98 are not in the source.
+    osm.relations.addRelation({
+      id: 20,
+      members: [
+        { type: "way", ref: 10, role: "outer" },
+        { type: "way", ref: 99, role: "outer" },
+        { type: "node", ref: 98, role: "label" },
+      ],
+      tags: { type: "multipolygon" },
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    const messages: string[] = [];
+    const smart = createExtract(osm, TEST_BBOX, "smart", (event) =>
+      messages.push(event.detail.msg),
+    );
+
+    expect(smart.relations.getById(20)?.members).toEqual([{ type: "way", ref: 10, role: "outer" }]);
+    expect(messages).toContain("Skipped 2 relation members missing from the source file.");
+  });
+
   test.skip("extract from a large PBF", async () => {
     const seattle = await fromPbf(getFixtureFileReadStream("usa.pbf"), {
       extractBbox: SEATTLE_BBOX,

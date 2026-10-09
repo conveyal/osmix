@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "fixtures:generate:merge-patch": "node scripts/generate-monaco-merge-patch.ts",
     "profile:merge": "node --expose-gc test/merge-profile-cli.ts",
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
     "typecheck": "tsc --noEmit"
@@ -42,8 +43,10 @@
   },
   "devDependencies": {
     "@mapbox/tilebelt": "^2.0.3",
+    "@mapbox/vector-tile": "^3.0.0",
     "@osmix/test-utils": "workspace:*",
     "@types/geojson": "catalog:",
+    "pbf": "catalog:",
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   },

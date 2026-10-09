@@ -122,6 +122,32 @@ describe("merged OSM state", () => {
     });
   });
 
+  it("renames to the slot's ID for the content hash while storage keeps the hash", async () => {
+    const afterRename = osm("patch-merged-hash", "merged-hash");
+    const get = vi
+      .fn<(id: string) => Promise<Osm>>()
+      .mockResolvedValueOnce(osm("patch-provisional", "merged-hash"))
+      .mockResolvedValueOnce(afterRename);
+    const rename = vi.fn(async () => {});
+
+    const result = await prepareMergedOsmState({
+      currentFileInfo: null,
+      currentOsm: null,
+      datasetIdFor: (contentHash) => `patch-${contentHash}`,
+      mergedFileName: "monaco-extract.pbf",
+      newOsmId: "patch-provisional",
+      worker: { get, rename },
+    });
+
+    expect(rename).toHaveBeenCalledExactlyOnceWith("patch-provisional", "patch-merged-hash");
+    expect(result).toMatchObject({
+      fileInfo: { fileHash: "merged-hash", fileName: "monaco-extract.pbf" },
+      kind: "changed",
+      osm: afterRename,
+      osmInfo: { id: "patch-merged-hash" },
+    });
+  });
+
   it("keeps source metadata when the applied changeset does not change content", async () => {
     const unchanged = osm("base", "base", true);
     const get = vi.fn<(id: string) => Promise<Osm>>().mockResolvedValue(unchanged);

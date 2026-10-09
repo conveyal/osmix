@@ -44,6 +44,36 @@ function dedupePoints(points: XY[]): XY[] {
   return result;
 }
 
+/** Round a tile-space point and clamp it to the tile extent plus `buffer`. */
+export function clampTilePoint(xy: XY, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER): XY {
+  return [
+    Math.round(clamp(xy[0], -buffer, extent + buffer)),
+    Math.round(clamp(xy[1], -buffer, extent + buffer)),
+  ];
+}
+
+/**
+ * Clip a projected polyline to the tile extent plus `buffer`, then round, clamp and dedupe its
+ * points. Returns the parts that keep at least two points.
+ */
+export function clipTileLine(
+  points: XY[],
+  extent = DEFAULT_EXTENT,
+  buffer = DEFAULT_BUFFER,
+): XY[][] {
+  const parts: XY[][] = [];
+  for (const segment of clipPolyline(points, [
+    -buffer,
+    -buffer,
+    extent + buffer,
+    extent + buffer,
+  ])) {
+    const part = dedupePoints(segment.map((xy) => clampTilePoint(xy, extent, buffer)));
+    if (part.length >= 2) parts.push(part);
+  }
+  return parts;
+}
+
 /**
  * Returns a projection function that converts [lon, lat] to [x, y] pixel coordinates
  * relative to the given tile. The extent determines the resolution of the tile
@@ -62,6 +92,7 @@ export class OsmixVtEncoder {
   readonly relationLayerName: string;
   private readonly osm: OsmReader;
   private readonly extent: number;
+  private readonly buffer: number;
   private readonly extentBbox: [number, number, number, number];
 
   static layerNames(id: string) {
@@ -78,6 +109,7 @@ export class OsmixVtEncoder {
     const min = -buffer;
     const max = extent + buffer;
     this.extent = extent;
+    this.buffer = buffer;
     this.extentBbox = [min, min, max, max];
 
     const layerName = `@osmix:${osm.id}`;
@@ -88,12 +120,12 @@ export class OsmixVtEncoder {
 
   /**
    * Get a vector tile PBF for a specific tile coordinate.
-   * Returns an empty buffer if the tile does not intersect with the OSM dataset.
+   * Returns an empty buffer if the dataset is empty or the tile does not intersect it.
    */
   getTile(tile: Tile): ArrayBuffer {
     const bbox = tileToBbox(tile);
     const osmBbox = this.osm.bbox();
-    if (!bboxContainsOrIntersects(bbox, osmBbox)) {
+    if (osmBbox === null || !bboxContainsOrIntersects(bbox, osmBbox)) {
       return new ArrayBuffer(0);
     }
     return this.getTileForBbox(bbox, (ll) => llToTilePx(ll, tile, this.extent));
@@ -105,15 +137,12 @@ export class OsmixVtEncoder {
    * @param proj A function to project [lon, lat] to [x, y] within the tile extent.
    */
   getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
-    // Get way IDs that are part of relations (to exclude from individual rendering)
-    const relationWayIds = this.osm.relations.getWayMemberIds();
-
     const layers = [
       {
         name: this.wayLayerName,
         version: 2,
         extent: this.extent,
-        features: this.wayFeatures(bbox, proj, relationWayIds),
+        features: this.wayFeatures(bbox, proj),
       },
       {
         name: this.nodeLayerName,
@@ -151,18 +180,22 @@ export class OsmixVtEncoder {
     }
   }
 
+  /**
+   * Encode the ways intersecting `bbox` as vector tile features.
+   * @param skipRelationWays Skip ways that are relation members, since relations render them.
+   */
   *wayFeatures(
     bbox: GeoBbox2D,
     proj: (ll: LonLat) => XY,
-    relationWayIds?: ReadonlySet<number>,
+    skipRelationWays = true,
   ): Generator<VtSimpleFeature> {
     const wayIndexes = this.osm.ways.intersects(bbox);
     for (let i = 0; i < wayIndexes.length; i++) {
       const wayIndex = wayIndexes[i];
       if (wayIndex === undefined) continue;
-      const id = this.osm.ways.ids.at(wayIndex);
       // Skip ways that are part of relations (they will be rendered via relations)
-      if (id !== undefined && relationWayIds?.has(id)) continue;
+      if (skipRelationWays && this.osm.relations.isWayMember(wayIndex)) continue;
+      const id = this.osm.ways.ids.at(wayIndex);
       const tags = this.osm.ways.tags.getTags(wayIndex);
       // Skip ways without tags (they are likely only for relations)
       if (!tags || Object.keys(tags).length === 0) continue;
@@ -196,14 +229,7 @@ export class OsmixVtEncoder {
           }
         }
       } else {
-        const clippedSegmentsRaw = this.clipProjectedPolyline(points);
-        for (const segment of clippedSegmentsRaw) {
-          const rounded = segment.map((xy) => this.clampAndRoundPoint(xy));
-          const deduped = dedupePoints(rounded);
-          if (deduped.length >= 2) {
-            geometry.push(deduped);
-          }
-        }
+        geometry.push(...clipTileLine(points, this.extent, this.buffer));
       }
       if (geometry.length === 0) continue;
       yield {
@@ -311,14 +337,7 @@ export class OsmixVtEncoder {
         for (const lineString of lineStrings) {
           const geometry: VtSimpleFeatureGeometry = [];
           const points: XY[] = lineString.map((ll) => proj(ll));
-          const clippedSegmentsRaw = this.clipProjectedPolyline(points);
-          for (const segment of clippedSegmentsRaw) {
-            const rounded = segment.map((xy) => this.clampAndRoundPoint(xy));
-            const deduped = dedupePoints(rounded);
-            if (deduped.length >= 2) {
-              geometry.push(deduped);
-            }
-          }
+          geometry.push(...clipTileLine(points, this.extent, this.buffer));
           if (geometry.length === 0) continue;
 
           yield {
@@ -353,9 +372,7 @@ export class OsmixVtEncoder {
   }
 
   clampAndRoundPoint(xy: XY): XY {
-    const clampedX = Math.round(clamp(xy[0], this.extentBbox[0], this.extentBbox[2]));
-    const clampedY = Math.round(clamp(xy[1], this.extentBbox[1], this.extentBbox[3]));
-    return [clampedX, clampedY] as XY;
+    return clampTilePoint(xy, this.extent, this.buffer);
   }
 }
 

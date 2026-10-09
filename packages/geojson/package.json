@@ -21,8 +21,7 @@
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "@placemarkio/geojson-rewind": "catalog:",
-    "dequal": "catalog:"
+    "@placemarkio/geojson-rewind": "catalog:"
   },
   "devDependencies": {
     "@types/geojson": "catalog:",

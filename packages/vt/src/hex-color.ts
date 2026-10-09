@@ -1,5 +1,3 @@
-import type { Rgba } from "@osmix/types";
-
 const hexPattern = /^[0-9a-fA-F]+$/;
 
 export function normalizeHexColor(value: string | number | null | undefined): string | undefined {
@@ -19,15 +17,4 @@ export function normalizeHexColor(value: string | number | null | undefined): st
   }
 
   return `#${hex.toUpperCase()}`;
-}
-
-export function hexColorToRgba(value: string | number | null | undefined): Rgba | undefined {
-  const normalized = normalizeHexColor(value);
-  if (!normalized) return;
-  const hex = normalized.slice(1);
-  const r = Number.parseInt(hex.slice(0, 2), 16);
-  const g = Number.parseInt(hex.slice(2, 4), 16);
-  const b = Number.parseInt(hex.slice(4, 6), 16);
-  const a = hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) : 255;
-  return [r, g, b, a];
 }

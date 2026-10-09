@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { OSM_STORE } from "../src/constants.ts";
+import { MERGE_DECISIONS_STORE, OSM_STORE } from "../src/constants.ts";
 import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "../src/workers/storage-schema.ts";
 
 function fakeDatabase() {
@@ -30,6 +30,7 @@ describe("upgradeOsmStore", () => {
       ["by-hash", "fileHash"],
       ["by-last-accessed", "lastAccessedAt"],
     ]);
+    expect(fake.createObjectStore).toHaveBeenCalledWith(MERGE_DECISIONS_STORE, { keyPath: "key" });
   });
 
   it.each([1, 2])("deletes and recreates an incompatible v%s store", (oldVersion) => {
@@ -44,10 +45,21 @@ describe("upgradeOsmStore", () => {
     expect(fake.createIndex).toHaveBeenCalledTimes(3);
   });
 
-  it("leaves a current v3 store unchanged", () => {
+  it("adds the saved decisions store to a v3 database, keeping its datasets", () => {
     const fake = fakeDatabase();
 
     upgradeOsmStore(fake.db, 3);
+
+    expect(fake.deleteObjectStore).not.toHaveBeenCalled();
+    expect(fake.createObjectStore.mock.calls).toEqual([
+      [MERGE_DECISIONS_STORE, { keyPath: "key" }],
+    ]);
+  });
+
+  it("leaves a current v4 database unchanged", () => {
+    const fake = fakeDatabase();
+
+    upgradeOsmStore(fake.db, 4);
 
     expect(fake.deleteObjectStore).not.toHaveBeenCalled();
     expect(fake.createObjectStore).not.toHaveBeenCalled();

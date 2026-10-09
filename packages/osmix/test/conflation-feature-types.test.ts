@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applyChangesetToOsm,
+  applyPlan,
   discoverConflationCandidates,
-  generateConflationChangeset,
+  type MergePlanOptions,
   merge,
   Osm,
   type OsmConflationCandidate,
@@ -11,8 +11,11 @@ import {
   type OsmConflationFeatureTypeConflict,
   type OsmConflationOptions,
   OsmixWorker,
-  resolveConflationActions,
+  planMerge,
+  type PlanProposal,
+  setMergePlanDecisions,
 } from "../src/index";
+import { withMatchingDecisions } from "./plan-decisions.ts";
 
 const candidateId = "node:101->1";
 const featureTypeConflict: OsmConflationFeatureTypeConflict = {
@@ -27,6 +30,14 @@ const accept: OsmConflationDecision = {
   attachNetwork: true,
 };
 const options: OsmConflationOptions = { propertyKeys: ["name"], attachNetwork: true };
+const direct: MergePlanOptions = { mergeIdenticalPoints: false, createIntersections: false };
+const planOptions: MergePlanOptions = { ...direct, matching: options };
+const connectId = "connect:n101>n1";
+const copyId = "copy:n101>n1";
+const acceptBoth = [
+  { proposalId: copyId, action: "accept" as const },
+  { proposalId: connectId, action: "accept" as const },
+];
 
 function inputs({
   baseAmenity = "cafe",
@@ -102,10 +113,18 @@ function expectConflict(candidate: OsmConflationCandidate) {
     },
     evidence: { featureTypeConflicts: [featureTypeConflict] },
   });
-  expect(resolveConflationActions(candidate, accept)).toEqual({
-    transferProperties: false,
-    attachNetwork: false,
-  });
+}
+
+/** Both entrance proposals are blocked for a feature-type conflict, whatever was decided. */
+function expectBlockedProposals(proposals: Iterable<PlanProposal>) {
+  const byId = new Map([...proposals].map((proposal) => [proposal.id, proposal]));
+  for (const id of [copyId, connectId]) {
+    expect(byId.get(id)).toMatchObject({
+      status: "blocked",
+      effect: "blocked",
+      reasons: expect.arrayContaining(["feature-type-conflict"]),
+    });
+  }
 }
 
 function expectOrdinaryAddition(result: Osm, base: Osm, patch: Osm) {
@@ -130,24 +149,20 @@ describe("feature classification conflicts through the public facade and worker"
       expect(candidate.evidence.tagDiff.map((diff) => diff.key)).toEqual(["name"]);
       if (relation) expect(candidate.reasons).toContain("relation-member");
 
-      const generated = generateConflationChangeset(
-        base,
-        patch,
-        { directMerge: true, conflation: options },
-        [accept],
-        discovery,
-      );
-      expect(generated.nodeChanges[1]).toBeUndefined();
-      expectOrdinaryAddition(applyChangesetToOsm(generated), base, patch);
+      const plan = planMerge(base, patch, planOptions, () => {});
+      setMergePlanDecisions(plan, acceptBoth);
+      expectBlockedProposals(plan.proposals.values());
+      expectOrdinaryAddition(applyPlan(plan).osm, base, patch);
     },
   );
 
   it("keeps the school as an ordinary import in the public merge despite explicit acceptance", async () => {
     const { base, patch } = inputs();
-    const result = await merge(base, patch, {
-      directMerge: true,
-      conflation: { ...options, decisions: [accept] },
-    });
+    const result = await merge(
+      base,
+      patch,
+      withMatchingDecisions(base, patch, planOptions, [accept]),
+    );
     expectOrdinaryAddition(result, base, patch);
   });
 
@@ -156,80 +171,66 @@ describe("feature classification conflicts through the public facade and worker"
     const worker = new TestWorker();
     worker.add(base);
     worker.add(patch);
-    worker.discoverConflation(base.id, patch.id, options);
-    worker.setConflationFilter(base.id, { sourceId: 101 });
-    const page = worker.getConflationPage(base.id, 0, 1);
-    const candidate = requireCandidate(page.candidates);
+    worker.planMerge(base.id, patch.id, planOptions);
+    const detail = worker.getMergePlanFeature(base.id, "way:20");
+    const candidate = detail.candidates[copyId];
+    if (!candidate) throw Error("Expected imported school candidate beside the cafe");
     expectConflict(candidate);
     const conflicts = candidate.evidence.featureTypeConflicts;
     if (!conflicts?.[0]) throw Error("Expected explicit conflicting feature classifications");
     conflicts[0].baseValue = "school";
     conflicts.splice(0, conflicts.length);
-    expectConflict(requireCandidate(worker.getConflationPage(base.id, 0, 1).candidates));
+    expectConflict(worker.getMergePlanFeature(base.id, "way:20").candidates[copyId]!);
 
-    worker.setConflationDecision(base.id, accept);
-    worker.setConflationFilter(base.id, { sourceId: 101, status: "accepted" });
-    expect(worker.getConflationPage(base.id, 0, 1).totalCandidates).toBe(0);
-    worker.setConflationFilter(base.id, {
-      sourceId: 101,
-      status: "blocked",
-      reason: "feature-type-conflict",
-    });
-    const blocked = worker.getConflationPage(base.id, 0, 1);
-    expect(blocked.totalCandidates).toBe(1);
-    expectConflict(requireCandidate(blocked.candidates));
-    expect(worker.getConflationSummary(base.id).blocked).toBe(1);
-    for (const action of ["transfer-properties", "attach-network"] as const) {
-      expect(blocked.bulkActions[action]).toMatchObject({
-        filteredCandidates: 1,
-        eligibleCandidates: 0,
-        changedCandidates: 0,
-        skippedCandidates: 1,
+    const decided = worker.setMergePlanDecisions(base.id, acceptBoth);
+    expect(decided.matching?.candidates.blocked).toBe(1);
+    worker.setMergePlanFilter(base.id, { status: "blocked", reason: "feature-type-conflict" });
+    const blocked = worker.getMergePlanPage(base.id, 0, 1);
+    expect(blocked.total).toBe(1);
+    expectBlockedProposals(blocked.features[0]!.proposals);
+    for (const kind of ["copy-tags", "connect"] as const) {
+      const bulk = worker.applyMergePlanBulk(base.id, {
+        action: "accept",
+        filter: { kind, reason: "feature-type-conflict" },
       });
-      const bulk = worker.applyConflationBulkDecision(base.id, {
-        action,
-        filter: { sourceId: 101, reason: "feature-type-conflict" },
-      });
-      expect(bulk.preview).toMatchObject({
-        filteredCandidates: 1,
-        eligibleCandidates: 0,
-        changedCandidates: 0,
-        skippedCandidates: 1,
-      });
-      expect(bulk.decisions).toEqual([accept]);
+      expect(bulk).toMatchObject({ changed: 0, waiting: 0 });
+      expect(bulk.overview.decisions).toEqual(acceptBoth);
     }
-    const generated = worker.generateConflationChangeset(base.id, { directMerge: true });
-    expect(generated.outcome.summary).toMatchObject({
+    expect(worker.getMergePlanOverview(base.id).matching?.outcome.summary).toMatchObject({
       tagCopyActions: 0,
       copiedTagValues: 0,
       networkAttachmentActions: 0,
     });
-    const preview = worker.getChangesetPage(base.id, 0, 100);
-    expect(
-      preview.changes?.some((change) => change.changeType === "modify" && change.entity.id === 1),
-    ).toBe(false);
-    worker.applyChangesAndReplace(base.id);
+    expect(worker.getMergePlanOsc(base.id)).toMatch(/<modify><\/modify>/);
+    worker.applyMergePlan(base.id);
     expectOrdinaryAddition(worker.getOsm(base.id), base, patch);
   });
 
   it("blocks attachment-only school/cafe matches at aligned footway endpoints", () => {
     const { base, patch } = inputs();
-    const attachmentOnly = { propertyKeys: [], attachNetwork: true };
     const worker = new TestWorker();
     worker.add(base);
     worker.add(patch);
-    worker.discoverConflation(base.id, patch.id, attachmentOnly);
-    worker.setConflationFilter(base.id, { sourceId: 101 });
-    const candidate = requireCandidate(worker.getConflationPage(base.id, 0, 1).candidates);
+    worker.planMerge(base.id, patch.id, {
+      ...direct,
+      matching: { propertyKeys: [], attachNetwork: true },
+    });
+    const detail = worker.getMergePlanFeature(base.id, "way:20");
+    const candidate = detail.candidates[connectId];
+    if (!candidate) throw Error("Expected imported school candidate beside the cafe");
     expect(candidate.evidence.tagDiff).toEqual([]);
     expect(candidate.networkAttachment).toMatchObject({
       status: "blocked",
       reasons: expect.arrayContaining(["feature-type-conflict"]),
     });
     expect(candidate.evidence).toMatchObject({ featureTypeConflicts: [featureTypeConflict] });
-    worker.setConflationDecision(base.id, { ...accept, transferProperties: false });
-    worker.generateConflationChangeset(base.id, { directMerge: true });
-    worker.applyChangesAndReplace(base.id);
+    worker.setMergePlanDecisions(base.id, [{ proposalId: connectId, action: "accept" }]);
+    expect(
+      worker
+        .getMergePlanPage(base.id, 0, 10)
+        .features[0]?.proposals.find(({ id }) => id === connectId),
+    ).toMatchObject({ decision: "accept", effect: "blocked" });
+    worker.applyMergePlan(base.id);
     expectOrdinaryAddition(worker.getOsm(base.id), base, patch);
   });
 
@@ -237,34 +238,28 @@ describe("feature classification conflicts through the public facade and worker"
     { name: "matching explicit types", baseAmenity: "cafe", patchAmenity: "cafe" },
     { name: "missing base classification", baseAmenity: null, patchAmenity: "school" },
     { name: "missing imported classification", baseAmenity: "cafe", patchAmenity: null },
-  ])("allows $name subject to the other matching checks", ({ baseAmenity, patchAmenity }) => {
+  ])("allows $name subject to the other matching checks", async ({ baseAmenity, patchAmenity }) => {
     const { base, patch } = inputs({ baseAmenity, patchAmenity });
     const discovery = discoverConflationCandidates(base, patch, options);
     const candidate = requireCandidate(discovery.candidates);
     expect(candidate.reasons).not.toContain("feature-type-conflict");
     expect(candidate.evidence.featureTypeConflicts ?? []).toEqual([]);
-    expect(resolveConflationActions(candidate)).toEqual({
-      transferProperties: true,
-      attachNetwork: true,
-    });
-    const generated = generateConflationChangeset(
-      base,
-      patch,
-      { directMerge: true, conflation: options },
-      [],
-      discovery,
-    );
-    const result = applyChangesetToOsm(generated);
+    expect(candidate.propertyTransfer.status).toBe("automatic");
+    expect(candidate.networkAttachment?.status).toBe("automatic");
+    const result = await merge(base, patch, planOptions);
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("Imported school");
-    expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe(baseAmenity ?? undefined);
-    expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
+    // The connection merges the imported point's tags too: its values win, base-only ones stay.
+    expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe(
+      patchAmenity ?? baseAmenity ?? undefined,
+    );
+    expect(result.nodes.getById(101)).toBeNull();
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
   });
 
   it("preserves authoritative same-ID updates even when feature classification changes", async () => {
     const { base, patch } = inputs({ sameId: true });
-    const result = await merge(base, patch, { directMerge: true, conflation: options });
+    const result = await merge(base, patch, planOptions);
     expect(result.nodes.getById(1)).toEqual(patch.nodes.getById(1));
     expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe("school");
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));

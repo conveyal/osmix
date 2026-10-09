@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ../../scripts/portless-dev.ts vt.osmix node --watch server.ts",
-    "dev:app": "node --watch server.ts",
+    "dev": "node --watch server.ts",
     "start": "node server.ts",
     "test": "node test/server.test.ts",
     "typecheck": "tsc --build --noEmit"
@@ -15,7 +14,6 @@
     "@osmix/core": "workspace:*",
     "@osmix/types": "workspace:*",
     "@osmix/vt": "workspace:*",
-    "comlink": "^4.4.2",
     "hono": "^4.13.8",
     "maplibre-gl": "catalog:",
     "osmix": "workspace:*"
@@ -24,6 +22,7 @@
     "@osmix/json": "workspace:*",
     "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

@@ -1,5 +1,5 @@
-import type { ClassValue } from "clsx";
-import { ChevronDown } from "lucide-react";
+import type { ClassValue } from "cn";
+import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "../lib/utils.ts";
@@ -32,14 +32,14 @@ export function DetailsSummary({
   return (
     <CollapsibleTrigger
       className={cn(
-        "group border-t w-full flex justify-between items-center p-2 cursor-pointer hover:bg-accent transition-colors h-8 data-panel-open:shadow-sm",
+        "group flex h-8 w-full cursor-pointer items-center justify-between border-t px-inset py-2 focus-ring transition-colors hover:bg-accent data-panel-open:border-b",
         className,
       )}
     >
       <SectionTitle>{children}</SectionTitle>
-      <ChevronDown
+      <ChevronDownIcon
         aria-hidden="true"
-        className="size-4 group-data-panel-open:rotate-180 transition-transform"
+        className="size-4 transition-transform group-data-panel-open:rotate-180"
       />
     </CollapsibleTrigger>
   );

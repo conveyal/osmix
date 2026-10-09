@@ -1,41 +1,57 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildConflationActionDecision,
-  conflationEffectiveStatus,
+  type MergePlanOptions,
   Osm,
-  type OsmConflationCandidate,
-  type OsmConflationDecision,
-  type OsmConflationResolvedActions,
   OsmixRemote,
   OsmixWorker,
-  resolveConflationActions,
+  type PlanDecision,
+  type PlanProposal,
 } from "../src/index";
 import { RoutingTestHarness } from "./routing-harness";
 
-const candidateId = "node:101->1";
-const options = { propertyKeys: ["name"], attachNetwork: true };
-const mergeOptions = { directMerge: true };
-const candidateFilter = { entityType: "node" as const, sourceId: 101 };
+const connectId = "connect:n101>n1";
+const copyId = "copy:n101>n1";
+const matching = { propertyKeys: ["name"], attachNetwork: true };
+const planOptions: MergePlanOptions = {
+  mergeIdenticalPoints: false,
+  createIntersections: false,
+  matching,
+};
 
+interface Actions {
+  transferProperties: boolean;
+  attachNetwork: boolean;
+}
+
+/**
+ * A base footway ending at entrance 1, and an imported footway starting 0.5 m from it. With
+ * `blockAttachment`, the base footway continues east and the imported one runs 0.4 m beside it
+ * through the entrance: a copy of the base path, whose point there is no junction (MP-M5).
+ */
 function inputs(blockAttachment = false) {
   const base = new Osm({ id: "actions-base" });
   base.nodes.addNode({ id: 1, lon: 0, lat: 0, tags: { name: "Base entrance" } });
   base.nodes.addNode({ id: 2, lon: -0.001, lat: 0 });
+  if (blockAttachment) base.nodes.addNode({ id: 3, lon: 0.001, lat: 0 });
   base.nodes.buildIndex();
-  base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
+  base.ways.addWay({
+    id: 10,
+    refs: blockAttachment ? [2, 1, 3] : [2, 1],
+    tags: { highway: "footway" },
+  });
   base.buildIndexes();
   base.buildSpatialIndexes();
   const patch = new Osm({ id: "actions-patch" });
-  patch.nodes.addNode({
-    id: 101,
-    lon: 0.000005,
-    lat: 0,
-    tags: { name: "Imported entrance", ...(blockAttachment ? { barrier: "gate" } : {}) },
-  });
-  patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
+  patch.nodes.addNode({ id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported entrance" } });
+  patch.nodes.addNode({ id: 102, lon: 0.001, lat: blockAttachment ? 0.000004 : 0 });
+  if (blockAttachment) patch.nodes.addNode({ id: 103, lon: -0.001, lat: 0.000004 });
   patch.nodes.buildIndex();
-  patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+  patch.ways.addWay({
+    id: 20,
+    refs: blockAttachment ? [103, 101, 102] : [101, 102],
+    tags: { highway: "footway" },
+  });
   patch.buildIndexes();
   patch.buildSpatialIndexes();
   return { base, patch };
@@ -60,47 +76,48 @@ class RecoveryRemote extends OsmixRemote {
   }
 }
 
-function setupWorker(blockAttachment = false) {
+function setupWorker(blockAttachment = false, options: MergePlanOptions = planOptions) {
   const { base, patch } = inputs(blockAttachment);
   const worker = new TestWorker();
   worker.setOsm(base);
   worker.setOsm(patch);
-  worker.discoverConflation(base.id, patch.id, options);
-  worker.setConflationFilter(base.id, candidateFilter);
+  worker.planMerge(base.id, patch.id, options);
   return { worker, base, patch };
 }
 
-function requireCandidate(page: Awaited<ReturnType<OsmixRemote["getConflationPage"]>>) {
-  const candidate = page.candidates.find((row) => row.id === candidateId);
-  if (!candidate) throw Error("Expected entrance candidate");
-  return candidate;
+/** The entrance's proposals, by ID, from the imported way's feature. */
+function entranceProposals(features: { proposals: PlanProposal[] }[]) {
+  const proposals = new Map(
+    features.flatMap((feature) => feature.proposals).map((proposal) => [proposal.id, proposal]),
+  );
+  const connect = proposals.get(connectId);
+  const copy = proposals.get(copyId);
+  if (!connect || !copy) throw Error("Expected entrance proposals");
+  return { connect, copy };
 }
 
-function expectPreview(
-  preview: Awaited<ReturnType<OsmixRemote["getChangesetPage"]>>,
-  actions: OsmConflationResolvedActions,
-) {
-  const baseNodeChange = preview.changes?.find(
-    (change) => change.entity.id === 1 && "lon" in change.entity,
-  );
-  if (actions.transferProperties) {
-    expect(baseNodeChange).toMatchObject({
-      changeType: "modify",
-      entity: { tags: { name: "Imported entrance" } },
-    });
-  } else expect(baseNodeChange).toBeUndefined();
-  expect(preview.changes?.find((change) => change.entity.id === 20)).toMatchObject({
-    changeType: "create",
-    entity: { refs: actions.attachNetwork ? [1, 102] : [101, 102] },
-  });
+function decisionsFor(actions: Actions): PlanDecision[] {
+  return [
+    { proposalId: copyId, action: actions.transferProperties ? "accept" : "reject" },
+    { proposalId: connectId, action: actions.attachNetwork ? "accept" : "reject" },
+  ];
 }
 
-function expectResult(osm: Osm, base: Osm, patch: Osm, actions: OsmConflationResolvedActions) {
-  const expectedNodes = [...base.nodes.sorted(), ...patch.nodes.sorted()].map((node) =>
-    node.id === 1 && actions.transferProperties
-      ? { ...node, tags: { ...node.tags, name: "Imported entrance" } }
-      : node,
-  );
+function expectEffects(features: { proposals: PlanProposal[] }[], actions: Actions) {
+  const { connect, copy } = entranceProposals(features);
+  expect(copy.effect).toBe(actions.transferProperties ? "applied" : "skipped");
+  expect(connect.effect).toBe(actions.attachNetwork ? "applied" : "skipped");
+}
+
+function expectResult(osm: Osm, base: Osm, patch: Osm, actions: Actions) {
+  // A connection merges the entrance's tags into base node 1 and drops imported point 101.
+  const expectedNodes = [...base.nodes.sorted(), ...patch.nodes.sorted()]
+    .filter((node) => node.id !== 101 || !actions.attachNetwork)
+    .map((node) =>
+      node.id === 1 && (actions.transferProperties || actions.attachNetwork)
+        ? { ...node, tags: { ...node.tags, name: "Imported entrance" } }
+        : node,
+    );
   const expectedWays = [...base.ways.sorted(), ...patch.ways.sorted()].map((way) =>
     way.id === 20 && actions.attachNetwork ? { ...way, refs: [1, 102] } : way,
   );
@@ -122,165 +139,143 @@ function expectResult(osm: Osm, base: Osm, patch: Osm, actions: OsmConflationRes
 }
 
 const selections = [
-  { name: "copy only", transferProperties: true, attachNetwork: false, action: "accept" },
-  { name: "connect only", transferProperties: false, attachNetwork: true, action: "accept" },
-  { name: "both", transferProperties: true, attachNetwork: true, action: "accept" },
-  { name: "neither", transferProperties: false, attachNetwork: false, action: "accept" },
-  { name: "reject", transferProperties: false, attachNetwork: false, action: "reject" },
+  { name: "copy only", transferProperties: true, attachNetwork: false },
+  { name: "connect only", transferProperties: false, attachNetwork: true },
+  { name: "both", transferProperties: true, attachNetwork: true },
+  { name: "neither", transferProperties: false, attachNetwork: false },
 ] as const;
 
-describe("scheduled conflation actions", () => {
+describe("scheduled matching actions", () => {
   it.each(selections)(
-    "preserves $name through paging, regeneration, and worker recovery",
-    async (selection) => {
+    "preserves $name through paging, replanning, and worker recovery",
+    async ({ transferProperties, attachNetwork }) => {
       const { base, patch } = inputs();
       using remote = new RecoveryRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);
       await remote.transferIn(base);
       await remote.transferIn(patch);
-      await remote.discoverConflation(base.id, patch.id, options);
-      await remote.setConflationFilter(base.id, candidateFilter);
-      const candidate = requireCandidate(await remote.getConflationPage(base.id, 0, 1));
-      expect(candidate.propertyTransfer.status).toBe("automatic");
-      expect(candidate.networkAttachment?.status).toBe("automatic");
-      const decision: OsmConflationDecision = {
-        candidateId,
-        action: selection.action,
-        transferProperties: selection.transferProperties,
-        attachNetwork: selection.attachNetwork,
-      };
-      const expected = {
-        transferProperties: selection.transferProperties,
-        attachNetwork: selection.attachNetwork,
-      };
-      await remote.setConflationDecision(base.id, decision);
-      const status =
-        expected.transferProperties || expected.attachNetwork ? "accepted" : "rejected";
-      await remote.setConflationFilter(base.id, { ...candidateFilter, status });
-      const saved = requireCandidate(await remote.getConflationPage(base.id, 0, 1));
-      expect(saved.decision).toEqual(decision);
-      expect(resolveConflationActions(saved, saved.decision)).toEqual(expected);
-      expect(conflationEffectiveStatus(saved, [decision])).toBe(status);
-      await remote.generateConflationChangeset(base.id, mergeOptions);
-      const preview = await remote.getChangesetPage(base.id, 0, 100);
-      expectPreview(preview, expected);
-      await remote.generateConflationChangeset(base.id, mergeOptions);
-      expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+      await remote.planMerge(base.id, patch.id, planOptions);
+      const planned = entranceProposals((await remote.getMergePlanPage(base.id, 0, 10)).features);
+      expect(planned.copy.status).toBe("automatic");
+      expect(planned.connect.status).toBe("automatic");
+      const expected = { transferProperties, attachNetwork };
+      const decided = await remote.setMergePlanDecisions(base.id, decisionsFor(expected));
+      expect(decided.decisions).toEqual(decisionsFor(expected));
+      await remote.setMergePlanFilter(base.id, { kind: "connect" });
+      const page = await remote.getMergePlanPage(base.id, 0, 10);
+      expectEffects(page.features, expected);
+      const osc = await remote.getMergePlanOsc(base.id);
 
       await remote.restartForTest();
 
-      const restored = requireCandidate(await remote.getConflationPage(base.id, 0, 1));
-      expect(restored.decision).toEqual(decision);
-      expect(resolveConflationActions(restored, restored.decision)).toEqual(expected);
-      expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-      await remote.applyChangesAndReplace(base.id);
+      expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
+      expect(await remote.getMergePlanPage(base.id, 0, 10)).toEqual(page);
+      expect(await remote.getMergePlanOsc(base.id)).toBe(osc);
+      await remote.applyMergePlan(base.id);
       expectResult(await remote.get(base.id), base, patch, expected);
     },
   );
 
-  it("preserves the other scheduled action while toggling and clears decisions back to automatic", () => {
+  it("toggles one action without changing the other and clears decisions back to automatic", () => {
     const { worker, base, patch } = setupWorker();
-    const candidate = requireCandidate(worker.getConflationPage(base.id, 0, 1));
-    let decision: OsmConflationDecision | undefined;
-    for (const selection of [
-      { action: "transfer-properties", selected: false, copy: false, connect: true },
-      { action: "attach-network", selected: false, copy: false, connect: false },
-      { action: "transfer-properties", selected: true, copy: true, connect: false },
-      { action: "attach-network", selected: true, copy: true, connect: true },
-    ] as const) {
-      decision = buildConflationActionDecision(
-        candidate,
-        decision,
-        selection.action,
-        selection.selected,
-      );
-      worker.setConflationDecision(base.id, decision);
-      const expected = { transferProperties: selection.copy, attachNetwork: selection.connect };
-      const saved = requireCandidate(worker.getConflationPage(base.id, 0, 1));
-      expect(resolveConflationActions(saved, saved.decision)).toEqual(expected);
-      worker.generateConflationChangeset(base.id, mergeOptions);
-      expectPreview(worker.getChangesetPage(base.id, 0, 100), expected);
+    for (const expected of [
+      { transferProperties: false, attachNetwork: true },
+      { transferProperties: false, attachNetwork: false },
+      { transferProperties: true, attachNetwork: false },
+      { transferProperties: true, attachNetwork: true },
+    ]) {
+      worker.setMergePlanDecisions(base.id, decisionsFor(expected));
+      expectEffects(worker.getMergePlanPage(base.id, 0, 10).features, expected);
     }
-    worker.setConflationDecision(base.id, { candidateId, action: "reject" });
-    worker.generateConflationChangeset(base.id, mergeOptions);
-    expectPreview(worker.getChangesetPage(base.id, 0, 100), {
-      transferProperties: false,
-      attachNetwork: false,
-    });
-    worker.setConflationDecisions(base.id, []);
-    expect(() => worker.getChangesetPage(base.id, 0, 100)).toThrow("No active changeset");
-    const automatic = requireCandidate(worker.getConflationPage(base.id, 0, 1));
-    expect(automatic.decision).toBeUndefined();
-    expect(resolveConflationActions(automatic)).toEqual({
+    const cleared = worker.setMergePlanDecisions(base.id, []);
+    expect(cleared.decisions).toEqual([]);
+    const automatic = entranceProposals(worker.getMergePlanPage(base.id, 0, 10).features);
+    expect(automatic.copy).not.toHaveProperty("decision");
+    expect(automatic.connect).not.toHaveProperty("decision");
+    expectEffects([{ proposals: [automatic.copy, automatic.connect] }], {
       transferProperties: true,
       attachNetwork: true,
     });
-    worker.generateConflationChangeset(base.id, mergeOptions);
-    worker.applyChangesAndReplace(base.id);
+    worker.applyMergePlan(base.id);
     expectResult(worker.getOsm(base.id), base, patch, {
       transferProperties: true,
       attachNetwork: true,
     });
   });
 
-  it.each(["neither", "rejected", "connect-only"] as const)(
-    "makes row and bulk copy choices equivalent from %s",
+  it.each(["undecided", "connect-left-out", "connect-only"] as const)(
+    "makes row and bulk copy acceptance equivalent from %s",
     (initial) => {
-      const row = setupWorker();
-      const bulk = setupWorker();
-      const prior: OsmConflationDecision = {
-        candidateId,
-        action: initial === "rejected" ? "reject" : "accept",
-        transferProperties: false,
-        attachNetwork: initial === "connect-only",
-      };
-      row.worker.setConflationDecision(row.base.id, prior);
-      bulk.worker.setConflationDecision(bulk.base.id, prior);
-      const candidate = requireCandidate(row.worker.getConflationPage(row.base.id, 0, 1));
-      row.worker.setConflationDecision(
-        row.base.id,
-        buildConflationActionDecision(candidate, prior, "transfer-properties", true),
-      );
-      const result = bulk.worker.applyConflationBulkDecision(bulk.base.id, {
-        action: "transfer-properties",
-        filter: candidateFilter,
+      // Bulk acceptance applies to proposals that need a decision, so nothing is automatic.
+      const options = { ...planOptions, matching: { ...matching, automatic: "none" as const } };
+      const row = setupWorker(false, options);
+      const bulk = setupWorker(false, options);
+      const prior: PlanDecision[] =
+        initial === "undecided"
+          ? []
+          : [{ proposalId: connectId, action: initial === "connect-only" ? "accept" : "reject" }];
+      row.worker.setMergePlanDecisions(row.base.id, prior);
+      bulk.worker.setMergePlanDecisions(bulk.base.id, prior);
+      row.worker.setMergePlanDecisions(row.base.id, [
+        ...prior.filter(({ proposalId }) => proposalId !== copyId),
+        { proposalId: copyId, action: "accept" },
+      ]);
+      const result = bulk.worker.applyMergePlanBulk(bulk.base.id, {
+        action: "accept",
+        filter: { kind: "copy-tags" },
       });
-      expect(result.preview).toMatchObject({
-        filteredCandidates: 1,
-        eligibleCandidates: 1,
-        changedCandidates: 1,
-      });
+      expect(result).toMatchObject({ changed: 1 });
       const expected = { transferProperties: true, attachNetwork: initial === "connect-only" };
       for (const { worker, base, patch } of [row, bulk]) {
-        const saved = requireCandidate(worker.getConflationPage(base.id, 0, 1));
-        expect(resolveConflationActions(saved, saved.decision)).toEqual(expected);
-        worker.generateConflationChangeset(base.id, mergeOptions);
-        expectPreview(worker.getChangesetPage(base.id, 0, 100), expected);
-        worker.applyChangesAndReplace(base.id);
+        const { connect, copy } = entranceProposals(
+          worker.getMergePlanPage(base.id, 0, 10).features,
+        );
+        expect(copy.effect).toBe("applied");
+        expect(connect.effect).toBe(
+          initial === "connect-only"
+            ? "applied"
+            : initial === "undecided"
+              ? "needs-decision"
+              : "skipped",
+        );
+        worker.applyMergePlan(base.id);
         expectResult(worker.getOsm(base.id), base, patch, expected);
       }
     },
   );
 
-  it("keeps a blocked connection unscheduled while an eligible tag copy remains selected", () => {
-    const { worker, base, patch } = setupWorker(true);
-    const candidate: OsmConflationCandidate = requireCandidate(
-      worker.getConflationPage(base.id, 0, 1),
-    );
-    expect(candidate.propertyTransfer.status).toBe("automatic");
-    expect(candidate.networkAttachment?.status).toBe("blocked");
-    worker.setConflationDecision(base.id, {
-      candidateId,
+  it("keeps a copy that was left out when copies are included in bulk", () => {
+    const options = { ...planOptions, matching: { ...matching, automatic: "none" as const } };
+    const { worker, base } = setupWorker(false, options);
+    worker.setMergePlanDecisions(base.id, [{ proposalId: copyId, action: "reject" }]);
+    const result = worker.applyMergePlanBulk(base.id, {
       action: "accept",
-      transferProperties: true,
-      attachNetwork: true,
+      filter: { kind: "copy-tags" },
     });
-    const saved = requireCandidate(worker.getConflationPage(base.id, 0, 1));
-    const expected = { transferProperties: true, attachNetwork: false };
-    expect(resolveConflationActions(saved, saved.decision)).toEqual(expected);
-    worker.generateConflationChangeset(base.id, mergeOptions);
-    expectPreview(worker.getChangesetPage(base.id, 0, 100), expected);
-    worker.applyChangesAndReplace(base.id);
-    expectResult(worker.getOsm(base.id), base, patch, expected);
+    expect(result.changed).toBe(0);
+    expect(
+      entranceProposals(result.overview && worker.getMergePlanPage(base.id, 0, 10).features).copy
+        .effect,
+    ).toBe("skipped");
+  });
+
+  it("keeps a blocked connection out of the result while an eligible tag copy applies", () => {
+    const { worker, base, patch } = setupWorker(true);
+    const planned = entranceProposals(worker.getMergePlanPage(base.id, 0, 10).features);
+    expect(planned.copy.status).toBe("automatic");
+    expect(planned.connect.status).toBe("blocked");
+    worker.setMergePlanDecisions(
+      base.id,
+      decisionsFor({ transferProperties: true, attachNetwork: true }),
+    );
+    const { connect, copy } = entranceProposals(worker.getMergePlanPage(base.id, 0, 10).features);
+    expect(copy.effect).toBe("applied");
+    expect(connect).toMatchObject({ decision: "accept", effect: "blocked" });
+    worker.applyMergePlan(base.id);
+    // The copy's ends connect to the base path's ends; the entrance stays its own point.
+    const result = worker.getOsm(base.id);
+    expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported entrance" });
+    expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
+    expect(result.ways.getById(20)?.refs).toEqual([2, 101, 3]);
   });
 });

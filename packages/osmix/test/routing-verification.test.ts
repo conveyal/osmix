@@ -86,12 +86,7 @@ describe("routing verification reports", () => {
     const empty = new Osm({ id: "empty" });
     empty.buildIndexes();
     empty.buildSpatialIndexes();
-    const merged = await merge(
-      raw,
-      empty,
-      { directMerge: true, deduplicateNodes: true, deduplicateWays: true },
-      () => {},
-    );
+    const merged = await merge(raw, empty, { createIntersections: false }, () => {});
     const reloaded = await fromPbf(await toPbfBuffer(merged), { id: "verification-reloaded" });
     variants = [raw, merged, reloaded].map((osm, index) => ({
       id: ["raw", "merged", "reloaded"][index]!,

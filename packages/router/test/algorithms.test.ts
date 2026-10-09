@@ -24,6 +24,35 @@ function createGraph(adjacencyList: Map<number, GraphEdge[]>): (nodeId: number) 
 }
 
 /**
+ * Creates the incoming-edge function for an adjacency list, as bidirectional needs.
+ * In each returned edge, `targetNodeIndex` is the source node.
+ */
+function createReverseContext(adjacencyList: Map<number, GraphEdge[]>) {
+  const incoming = new Map<number, GraphEdge[]>();
+  for (const [source, edges] of adjacencyList) {
+    for (const edge of edges) {
+      const list = incoming.get(edge.targetNodeIndex) ?? [];
+      list.push({ ...edge, targetNodeIndex: source });
+      incoming.set(edge.targetNodeIndex, list);
+    }
+  }
+  return { reverseGraph: (nodeId: number) => incoming.get(nodeId) ?? [] };
+}
+
+/** Run bidirectional search over an adjacency list. */
+function runBidirectional(adjacencyList: Map<number, GraphEdge[]>, start: number, end: number) {
+  return bidirectional(
+    createGraph(adjacencyList),
+    start,
+    end,
+    distanceWeight,
+    undefined,
+    undefined,
+    createReverseContext(adjacencyList),
+  );
+}
+
+/**
  * Simple edge weight function that uses distance.
  */
 function distanceWeight(edge: GraphEdge): number {
@@ -325,9 +354,33 @@ describe("astar", () => {
 // ---------------------------------------------------------------------------
 
 describe("bidirectional", () => {
+  it("follows one-way edges backward from the end", () => {
+    // 1 -> 2 -> 3 is one-way; 1 <-> 4 <-> 3 is a longer two-way detour.
+    // Going 3 to 1 must take the detour: the old search followed 3's outgoing
+    // edges from the end and could return 3 -> 2 -> 1 against the one-way.
+    const oneWay = new Map([
+      [1, [mockEdge(2, 100, 1), mockEdge(4, 101, 10)]],
+      [2, [mockEdge(3, 100, 1)]],
+      [3, [mockEdge(4, 102, 10)]],
+      [4, [mockEdge(1, 101, 10), mockEdge(3, 102, 10)]],
+    ]);
+    expect(runBidirectional(oneWay, 3, 1)?.map((p) => p.nodeIndex)).toEqual([3, 4, 1]);
+    expect(runBidirectional(oneWay, 1, 3)?.map((p) => p.nodeIndex)).toEqual([1, 2, 3]);
+  });
+
+  it("reports costs from the start on both halves of the path", () => {
+    const path = runBidirectional(createIndirectShorterGraph(), 1, 4);
+    expect(path?.map((p) => p.cost)).toEqual([0, 10, 20, 30]);
+  });
+
+  it("throws without a reverse graph", () => {
+    expect(() => bidirectional(createGraph(createLinearGraph()), 1, 4, distanceWeight)).toThrow(
+      /reverseGraph/,
+    );
+  });
+
   it("should find direct path between adjacent nodes", () => {
-    const graph = createGraph(createLinearGraph());
-    const path = bidirectional(graph, 1, 2, distanceWeight);
+    const path = runBidirectional(createLinearGraph(), 1, 2);
 
     expect(path).not.toBeNull();
     // Bidirectional may have different path structure but same nodes
@@ -337,8 +390,7 @@ describe("bidirectional", () => {
   });
 
   it("should find path through multiple nodes", () => {
-    const graph = createGraph(createLinearGraph());
-    const path = bidirectional(graph, 1, 4, distanceWeight);
+    const path = runBidirectional(createLinearGraph(), 1, 4);
 
     expect(path).not.toBeNull();
     const nodeIds = path?.map((p) => p.nodeIndex);
@@ -348,15 +400,13 @@ describe("bidirectional", () => {
   });
 
   it("should return null when no path exists", () => {
-    const graph = createGraph(createDisconnectedGraph());
-    const path = bidirectional(graph, 1, 4, distanceWeight);
+    const path = runBidirectional(createDisconnectedGraph(), 1, 4);
 
     expect(path).toBeNull();
   });
 
   it("should handle same start and end node", () => {
-    const graph = createGraph(createLinearGraph());
-    const path = bidirectional(graph, 1, 1, distanceWeight);
+    const path = runBidirectional(createLinearGraph(), 1, 1);
 
     expect(path).not.toBeNull();
     expect(path?.some((p) => p.nodeIndex === 1)).toBe(true);
@@ -373,8 +423,7 @@ describe("bidirectional", () => {
       [5, [mockEdge(4, 103, 10)]],
     ]);
 
-    const graph = createGraph(symmetricGraph);
-    const path = bidirectional(graph, 1, 5, distanceWeight);
+    const path = runBidirectional(symmetricGraph, 1, 5);
 
     expect(path).not.toBeNull();
     // Should include start and end
@@ -384,8 +433,7 @@ describe("bidirectional", () => {
   });
 
   it("should combine forward and backward paths properly", () => {
-    const graph = createGraph(createSquareGraph());
-    const path = bidirectional(graph, 1, 4, distanceWeight);
+    const path = runBidirectional(createSquareGraph(), 1, 4);
 
     expect(path).not.toBeNull();
 
@@ -397,8 +445,7 @@ describe("bidirectional", () => {
   });
 
   it("should track way indexes in combined path", () => {
-    const graph = createGraph(createSquareGraph());
-    const path = bidirectional(graph, 1, 4, distanceWeight);
+    const path = runBidirectional(createSquareGraph(), 1, 4);
 
     expect(path).not.toBeNull();
 
@@ -418,18 +465,21 @@ describe("algorithm consistency", () => {
 
     const dijkstraPath = dijkstra(graph, 1, 4, distanceWeight);
     const astarPath = astar(graph, 1, 4, distanceWeight, createCoordFn());
-    const biPath = bidirectional(graph, 1, 4, distanceWeight);
+    const biPath = runBidirectional(createIndirectShorterGraph(), 1, 4);
 
     // All should find a path
     expect(dijkstraPath).not.toBeNull();
     expect(astarPath).not.toBeNull();
     expect(biPath).not.toBeNull();
 
-    // Dijkstra and A* should have same final cost
+    // All three are optimal, so they share the final cost
     const dijkstraCost = dijkstraPath?.[dijkstraPath.length - 1]?.cost;
     const astarCost = astarPath?.[astarPath.length - 1]?.cost;
+    const biCost = biPath?.[biPath.length - 1]?.cost;
 
     expect(dijkstraCost).toBe(astarCost);
+    expect(biCost).toBe(dijkstraCost);
+    expect(biPath?.map((p) => p.nodeIndex)).toEqual([1, 2, 3, 4]);
   });
 
   it("all algorithms should return null for unreachable nodes", () => {
@@ -437,7 +487,7 @@ describe("algorithm consistency", () => {
 
     expect(dijkstra(graph, 1, 4, distanceWeight)).toBeNull();
     expect(astar(graph, 1, 4, distanceWeight, createCoordFn())).toBeNull();
-    expect(bidirectional(graph, 1, 4, distanceWeight)).toBeNull();
+    expect(runBidirectional(createDisconnectedGraph(), 1, 4)).toBeNull();
   });
 
   it("all algorithms should handle trivial single-node path", () => {
@@ -445,7 +495,7 @@ describe("algorithm consistency", () => {
 
     const dijkstraPath = dijkstra(graph, 1, 1, distanceWeight);
     const astarPath = astar(graph, 1, 1, distanceWeight, createCoordFn());
-    const biPath = bidirectional(graph, 1, 1, distanceWeight);
+    const biPath = runBidirectional(createLinearGraph(), 1, 1);
 
     expect(dijkstraPath).not.toBeNull();
     expect(astarPath).not.toBeNull();

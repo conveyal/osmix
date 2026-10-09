@@ -3,8 +3,8 @@ import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
-import { generateChangeset } from "../src/generate-changeset.ts";
 import { merge } from "../src/merge.ts";
+import { stagedChanges } from "./helpers/changes.ts";
 
 function createOsm(
   id: string,
@@ -35,12 +35,7 @@ describe("routing-safe merge reconciliation", () => {
     );
     const patch = createOsm("empty", []);
 
-    const result = await merge(
-      base,
-      patch,
-      { directMerge: true, deduplicateNodes: true, deduplicateWays: true },
-      silent,
-    );
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect([...result.nodes].map((node) => node.id)).toEqual([1, 2]);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
@@ -74,7 +69,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.nodes.ids.has(102)).toBe(true);
@@ -82,7 +77,7 @@ describe("routing-safe merge reconciliation", () => {
     expect(result.ways.getById(21)?.refs).toEqual([102, 103]);
   });
 
-  it("rejects conflicting node tags and preserves non-conflicting descriptive tags", async () => {
+  it("lets imported node values win a conflict and keeps descriptive tags", async () => {
     const base = createOsm(
       "base",
       [
@@ -105,16 +100,20 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
-    expect(result.nodes.ids.has(101)).toBe(true);
-    expect(result.ways.getById(20)?.refs).toEqual([101, 103]);
+    // The base ID survives with the imported value (MP-X1).
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.nodes.getById(1)?.tags).toEqual({ amenity: "school" });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 103]);
     expect(result.nodes.ids.has(102)).toBe(false);
     expect(result.nodes.getById(3)?.tags).toEqual({ name: "Patch endpoint" });
     expect(result.ways.getById(21)?.refs).toEqual([3, 103]);
   });
 
-  it("rejects a candidate when any incident way has incompatible context", async () => {
+  // The rulebook checks the whole resulting junction with final validation's grade rule, not
+  // every way pair: joining where a surface road meets a tunnel portal is a valid junction.
+  it("joins a surface road at a tunnel portal where a surface road also ends", async () => {
     const base = createOsm(
       "base",
       [
@@ -140,7 +139,40 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 102], tags: { highway: "secondary" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
+
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
+  });
+
+  it("rejects a candidate inside a tunnel, which final validation would reject", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: -1, lat: 0 },
+        { id: 3, lon: 1, lat: 0 },
+        { id: 4, lon: 0, lat: -1 },
+      ],
+      [
+        { id: 10, refs: [4, 1], tags: { highway: "primary" } },
+        {
+          id: 11,
+          refs: [2, 1, 3],
+          tags: { highway: "primary", layer: "-1", tunnel: "yes" },
+        },
+      ],
+    );
+    const patch = createOsm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0 },
+        { id: 102, lon: 0, lat: 1 },
+      ],
+      [{ id: 20, refs: [101, 102], tags: { highway: "secondary" } }],
+    );
+
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
@@ -158,7 +190,7 @@ describe("routing-safe merge reconciliation", () => {
     );
     const patch = createOsm("patch", [{ id: 1, lon: 1, lat: 0 }]);
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(1)).toBe(true);
     expect(result.nodes.ids.has(2)).toBe(true);
@@ -177,42 +209,21 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 102], tags: { highway: "service" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.nodes.ids.has(102)).toBe(true);
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
   });
 
-  it("does not reconcile ways with conflicting routing tags", async () => {
+  it("lets an imported way's values win when ways reconcile, routing values included", async () => {
     const base = createOsm(
       "base",
       [
         { id: 1, lon: 0, lat: 0 },
         { id: 2, lon: 1, lat: 0 },
       ],
-      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
-    );
-    const patch = createOsm(
-      "patch",
-      [],
-      [{ id: 20, refs: [1, 2], tags: { highway: "residential", oneway: "yes" } }],
-    );
-
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
-
-    expect(result.ways.ids.has(10)).toBe(true);
-    expect(result.ways.ids.has(20)).toBe(true);
-  });
-
-  it("does not reconcile ways with conditional access semantics", async () => {
-    const base = createOsm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0 },
-        { id: 2, lon: 1, lat: 0 },
-      ],
-      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
+      [{ id: 10, refs: [1, 2], tags: { highway: "residential", name: "Base", surface: "gravel" } }],
     );
     const patch = createOsm(
       "patch",
@@ -225,19 +236,64 @@ describe("routing-safe merge reconciliation", () => {
             "access:conditional": "no @ (Mo-Fr 07:00-09:00)",
             highway: "residential",
             name: "School Street",
+            oneway: "yes",
           },
         },
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
-    expect(result.ways.ids.has(10)).toBe(true);
-    expect(result.ways.ids.has(20)).toBe(true);
-    expect(result.ways.getById(10)?.tags).toEqual({ highway: "residential" });
+    expect(result.ways.ids.has(20)).toBe(false);
+    // A key only the base has stays: a missing imported value never means delete.
+    expect(result.ways.getById(10)?.tags).toEqual({
+      "access:conditional": "no @ (Mo-Fr 07:00-09:00)",
+      highway: "residential",
+      name: "School Street",
+      oneway: "yes",
+      surface: "gravel",
+    });
   });
 
-  it("copies only non-conflicting descriptive tags when ways reconcile", async () => {
+  it("does not reconcile a highway with a way that is not one", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 1, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { barrier: "fence" } }],
+    );
+    const patch = createOsm("patch", [], [{ id: 20, refs: [1, 2], tags: { highway: "footway" } }]);
+
+    const result = await merge(base, patch, { createIntersections: false }, silent);
+
+    expect(result.ways.getById(10)?.tags).toEqual({ barrier: "fence" });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 2]);
+  });
+
+  it("leaves a reconcile that would change the base way's grade for a person", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 1, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { highway: "footway" } }],
+    );
+    const patch = createOsm(
+      "patch",
+      [],
+      [{ id: 20, refs: [1, 2], tags: { highway: "footway", bridge: "yes", layer: "1" } }],
+    );
+
+    const result = await merge(base, patch, { createIntersections: false }, silent);
+
+    expect(result.ways.getById(10)?.tags).toEqual({ highway: "footway" });
+    expect(result.ways.ids.has(20)).toBe(true);
+  });
+
+  it("adds an imported way's name when ways reconcile", async () => {
     const base = createOsm(
       "base",
       [
@@ -252,7 +308,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [1, 2], tags: { highway: "residential", name: "Connector" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(result.ways.getById(10)?.tags).toEqual({
@@ -261,7 +317,7 @@ describe("routing-safe merge reconciliation", () => {
     });
   });
 
-  it("checks complete way semantics when exact-index hashes collide", async () => {
+  it("reconciles with the one base way that agrees when two share the refs", async () => {
     const base = createOsm(
       "base",
       [
@@ -297,7 +353,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(result.ways.getById(10)?.tags?.["name"]).toBeUndefined();
@@ -312,9 +368,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 999], tags: { highway: "service" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "way 20 references missing node 999",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("way 20 references missing node 999");
   });
 
   it("rejects a new patch restriction that is detached in the merged network", async () => {
@@ -348,7 +404,9 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow(
       "restriction 100 via node 2 is detached from its from/to ways (from: [10]; to: [20])",
     );
   });
@@ -383,7 +441,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.getById(30)?.refs).toEqual([2, 1]);
     expect(result.relations.getById(100)?.members[1]).toEqual({
@@ -427,9 +485,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [4, 3], tags: { highway: "primary" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "restriction 100 via node 2 is detached",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("restriction 100 via node 2 is detached");
   });
 
   it("rejects newly connected highways with incompatible grade signatures", async () => {
@@ -458,9 +516,9 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "node 1 newly connects grade-separated highways 10 and 20",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("node 1 newly connects grade-separated highways 10 and 20");
   });
 
   it("allows a surface road endpoint to transition into a bridge endpoint", async () => {
@@ -487,7 +545,12 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      silent,
+    );
 
     expect(result.ways.getById(20)?.refs).toEqual([2, 3]);
   });
@@ -521,7 +584,12 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      silent,
+    );
 
     expect(result.ways.getById(10)?.refs).toEqual([1, 2, 3]);
     expect(result.ways.getById(20)?.refs).toEqual([2, 5]);
@@ -559,9 +627,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [2, 5], tags: { highway: "primary" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "node 2 newly connects grade-separated highways 10 and 20",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("node 2 newly connects grade-separated highways 10 and 20");
   });
 
   it("tolerates an inherited interior grade issue during an unrelated change", () => {
@@ -582,26 +650,16 @@ describe("routing-safe merge reconciliation", () => {
         },
       ],
     );
-    const changeset = generateChangeset(
+    const changeset = stagedChanges(
       base,
       createOsm("patch", [{ id: 1, lon: -1, lat: 0, tags: { name: "Unrelated" } }]),
       { directMerge: true },
-      silent,
     );
 
     expect(() => applyChangesetToOsm(changeset)).not.toThrow();
   });
 
-  it("rejects direct merge plus intersections in one generated changeset", () => {
-    const base = createOsm("base", []);
-    const patch = createOsm("patch", []);
-
-    expect(() =>
-      generateChangeset(base, patch, { directMerge: true, createIntersections: true }, silent),
-    ).toThrow("generateChangeset cannot combine directMerge with createIntersections");
-  });
-
-  it("keeps high-level and generated changeset reconciliation in parity", async () => {
+  it("keeps merge and staged changeset reconciliation in parity", async () => {
     const base = createOsm(
       "base",
       [
@@ -620,8 +678,8 @@ describe("routing-safe merge reconciliation", () => {
     );
     const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
 
-    const highLevel = await merge(base, patch, options, silent);
-    const generated = applyChangesetToOsm(generateChangeset(base, patch, options, silent));
+    const highLevel = await merge(base, patch, { createIntersections: false }, silent);
+    const generated = applyChangesetToOsm(stagedChanges(base, patch, options));
 
     expect([...highLevel.nodes].map((node) => node.id)).toEqual(
       [...generated.nodes].map((node) => node.id),

@@ -284,7 +284,12 @@ describe("matching and routing way direction", () => {
       );
       if (!scenario.compatible) expect(candidate?.reasons).toContain("routing-family-conflict");
 
-      const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
+      const result = await merge(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+        () => {},
+      );
       const reloaded = await fromPbf(await toPbfBuffer(result), { id: "reloaded" });
       for (const osm of [result, reloaded]) {
         expectDirections(osm, [baseWay, patchWay]);
@@ -338,7 +343,12 @@ describe("matching and routing way direction", () => {
     expect(candidate?.propertyTransfer.status).toBe("blocked");
     expect(candidate?.reasons).toContain("routing-family-conflict");
 
-    const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      () => {},
+    );
     const reloaded = await fromPbf(await toPbfBuffer(result), { id: "reloaded" });
     for (const osm of [result, reloaded]) {
       expectGraphEdges(osm, [...baseEdges, ...patchEdges]);

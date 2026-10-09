@@ -1,8 +1,8 @@
 import type { GeoBbox2D, LonLat } from "osmix";
 
 export const TILE_SIZE = 256;
-export const MIN_ZOOM = 0;
-export const MAX_ZOOM = 20;
+const MIN_ZOOM = 0;
+const MAX_ZOOM = 20;
 
 const MAX_MERCATOR_LATITUDE = 85.051_128_78;
 const FIT_PADDING = 0.9;

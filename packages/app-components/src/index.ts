@@ -1,9 +1,32 @@
+export { ActivityButton } from "./components/activity-button.tsx";
+export { ActivitySheet } from "./components/activity-sheet.tsx";
 export { AppLinks } from "./components/app-links.tsx";
-export { OsmixAppShell } from "./components/app-shell.tsx";
+export { OsmixAppShell, OsmixNav } from "./components/app-shell.tsx";
 export { default as Basemap, type MapInitialViewState } from "./components/basemap.tsx";
 export { default as BrowserCheck } from "./components/browser-check.tsx";
-export { default as CenterInfo } from "./components/center-info.tsx";
-export { default as CustomControl } from "./components/custom-control.tsx";
+export {
+  type LoadedMapDataset,
+  MapDatasetsContext,
+  useMapDatasets,
+} from "./components/map-datasets.tsx";
+export { type InspectorView, inspectorView, MapInspector } from "./components/map-inspector.tsx";
+export { MapLegend } from "./components/map-legend.tsx";
+export { MapPanelBody, MapPanelHeader } from "./components/map-panel-header.tsx";
+export { MapRoleSymbol } from "./components/map-role-symbol.tsx";
+export { MAP_INSPECTOR_TITLE_SLOT, MapSearch } from "./components/map-search.tsx";
+export { MapToolbar, unionBboxes } from "./components/map-toolbar.tsx";
+export {
+  DOCKED_MIN_WIDTH,
+  MapOverlay,
+  type MapOverlayActions,
+  type MapOverlayLayer,
+  type MapOverlayLayout,
+  MapPanel,
+  useMapAnnounce,
+  useMapOverlayAction,
+  useMapOverlayActions,
+  useMapOverlayLayout,
+} from "./components/map-overlay.tsx";
 export {
   default as EntityDetails,
   EntityContent,
@@ -16,68 +39,111 @@ export {
   WayContent,
   WayDetails,
 } from "./components/entity-details.tsx";
-export { default as EntityDetailsMapControl } from "./components/entity-details-map-control.tsx";
-export { default as EntityLookup } from "./components/entity-lookup.tsx";
 export { FullIndexRequired, hasFullNodeIndex } from "./components/full-index-required.tsx";
+export { SaveToDiskNotice } from "./components/save-to-disk-notice.tsx";
 export { InspectPanel } from "./components/inspect-panel.tsx";
-export { default as LogContent } from "./components/log.tsx";
-export { default as MapLayerControl, MapLayers } from "./components/map-layer-control.tsx";
-export { MapNavControls } from "./components/map-nav-controls.tsx";
 export {
-  default as NominatimSearchControl,
+  focusNominatimResult,
   NominatimSearch,
   type NominatimResult,
-} from "./components/nominatim-search-control.tsx";
+  searchNominatim,
+} from "./components/nominatim-search.tsx";
 export {
   default as ChangesSummary,
-  ChangesExpandableList,
   ChangesFilters,
   ChangesList,
   ChangesPagination,
 } from "./components/osm-changes-summary.tsx";
 export {
-  default as OsmFileMapControl,
-  type OsmFileMapControlProps,
-} from "./components/osm-file-map-control.tsx";
-export { default as OsmInfoTable } from "./components/osm-info-table.tsx";
+  default as OsmInfoTable,
+  OsmLoadDetails,
+  OsmLoadDetailsRows,
+  OsmLoadDiagnostics,
+} from "./components/osm-info-table.tsx";
 export { OsmLoadFailurePanel } from "./components/osm-load-failure.tsx";
 export {
   default as OsmPbfFileInput,
+  OsmLoadProfileDisclosure,
   OsmLoadProfileSelector,
   OsmPbfClearFileButton,
+  OsmPbfSelectedFile,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
+  showFileSelector,
 } from "./components/osm-pbf-file-input.tsx";
+export { OsmDatasetSection } from "./components/osm-dataset-section.tsx";
 export { OsmSourceLinks } from "./components/osm-source-links.tsx";
+export { type MapDataset, OsmixMap } from "./components/osmix-map.tsx";
 export { OsmixMapSources } from "./components/osmix-map-sources.tsx";
 export { default as OsmixRasterSource } from "./components/osmix-raster-source.tsx";
-export { default as OsmixVectorOverlay } from "./components/osmix-vector-overlay.tsx";
-export { default as RouteMapControl, Routing } from "./components/route-control.tsx";
+export {
+  default as OsmixVectorOverlay,
+  type OsmixOverlayRole,
+} from "./components/osmix-vector-overlay.tsx";
 export { default as RouteLayer } from "./components/route-layer.tsx";
+export { RoutingInspector } from "./components/routing-tool.tsx";
 export { default as SelectedEntityLayer } from "./components/selected-entity-layer.tsx";
-export { default as SidebarLog } from "./components/sidebar-log.tsx";
-export { default as Status } from "./components/status.tsx";
 export { StoredOsmList } from "./components/stored-osm-list.tsx";
-export { default as ZoomInfo, ZoomInButton, ZoomOutButton } from "./components/zoom-info.tsx";
+export {
+  PROGRESS_TOAST_DELAY_MS,
+  QUIET_TASK_MS,
+  type TaskToastEvent,
+  type TaskToastRequest,
+  TaskToasts,
+  taskOutcomeToast,
+  taskToastEvents,
+  taskToastId,
+} from "./components/task-toasts.tsx";
 export { createOsmixAppRuntime, type OsmixAppRuntime, type OsmixAppStore } from "./bootstrap.ts";
 export {
   APPID,
   BASE_MAP_STYLES,
-  DEFAULT_BASE_MAP_STYLE,
   MIN_PICKABLE_ZOOM,
   RASTER_PROTOCOL_NAME,
   RASTER_TILE_SIZE,
   VECTOR_PROTOCOL_NAME,
 } from "./constants.ts";
-export { useFlyToEntity, useFlyToOsmBounds, useMap } from "./hooks/map.ts";
-export { appOrigin, OSMIX_APPS, type OsmixAppId } from "./lib/app-origin.ts";
-export { getOsmixEntityByStringId } from "./lib/entity-id.ts";
+export {
+  type MapPadding,
+  paddingOffset,
+  useFlyToEntity,
+  useFlyToOsmBounds,
+  useMap,
+  useMapPadding,
+  useSelectAndFlyToEntity,
+  withMapInset,
+} from "./hooks/map.ts";
+export {
+  type MapColorRole,
+  type MapColors,
+  readMapColors,
+  useMapColors,
+} from "./hooks/map-colors.ts";
+export {
+  HOME_PATH,
+  OSMIX_PAGES,
+  type OsmixPageId,
+  type OsmixRoute,
+  isFullPageRoute,
+  LIMITS_PATH,
+  pagePath,
+  routeForPath,
+} from "./lib/app-pages.ts";
+export {
+  applyBasemapPreset,
+  type BasemapLayerKind,
+  basemapLayerVisibility,
+  classifyBasemapLayer,
+} from "./lib/basemap-layers.ts";
+export { type EntityQuery, getOsmixEntityByStringId, parseEntityQuery } from "./lib/entity-id.ts";
 export { installMaplibreWorker } from "./lib/maplibre-worker.ts";
+export { planTileUrl } from "./lib/osmix-plan-protocol.ts";
 export { registerOsmixProtocols } from "./lib/osmix-protocols.ts";
 export {
   addOsmixRasterProtocol,
   osmixIdToTileUrl as osmixIdToRasterTileUrl,
   RASTER_URL_PATTERN,
+  type RasterColorRole,
   rasterTileToImageBuffer,
   removeOsmixRasterProtocol,
 } from "./lib/osmix-raster-protocol.ts";
@@ -86,7 +152,12 @@ export {
   osmixIdToTileUrl as osmixIdToVectorTileUrl,
   removeOsmixVectorProtocol,
 } from "./lib/osmix-vector-protocol.ts";
+export { acknowledgedErrorIdAtom, activitySheetOpenAtom, latestErrorId } from "./state/activity.ts";
+export { nominatimPlaceAtom } from "./state/nominatim.ts";
 export {
+  enterRoutingModeAtom,
+  exitRoutingModeAtom,
+  initialRoutingState,
   type RoutingState,
   routingGeoJsonAtom,
   routingStateAtom,

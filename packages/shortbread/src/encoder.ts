@@ -170,12 +170,13 @@ export class ShortbreadVtEncoder {
   }
 
   /**
-   * Generate a vector tile for the given tile coordinates
+   * Generate a vector tile for the given tile coordinates.
+   * Returns an empty buffer if the dataset is empty or the tile does not intersect it.
    */
   getTile(tile: Tile): ArrayBuffer {
     const bbox = tileToBbox(tile);
     const osmBbox = this.osm.bbox();
-    if (!bboxContainsOrIntersects(bbox, osmBbox)) {
+    if (osmBbox === null || !bboxContainsOrIntersects(bbox, osmBbox)) {
       return new ArrayBuffer(0);
     }
     return this.getTileForBbox(bbox, (ll) => llToTilePx(ll, tile, this.extent));

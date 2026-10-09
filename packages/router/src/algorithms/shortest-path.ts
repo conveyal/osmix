@@ -13,10 +13,10 @@ import { BinaryHeap } from "../binary-heap.ts";
 import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types.ts";
 
 /**
- * Maximum speed (m/s) for time-based heuristic.
- * Uses 130 km/h (~36.1 m/s) to ensure admissibility on all road types.
+ * Default maximum speed (m/s) for the time heuristic when the caller does not
+ * pass the graph's real maximum: 130 km/h (~36.1 m/s).
  */
-const MAX_SPEED_MS = (130 * 1000) / 3600;
+const DEFAULT_MAX_SPEED_MPS = (130 * 1000) / 3600;
 
 /**
  * A* shortest path algorithm with configurable heuristic.
@@ -122,10 +122,20 @@ export const dijkstra: RoutingAlgorithmFn = (graph, start, end, getWeight) => {
  *
  * The heuristic is adapted based on the metric:
  * - distance: haversine distance in meters
- * - time: haversine distance / max speed (lower bound on travel time in seconds)
+ * - time: haversine distance / `context.maxSpeedMps` (lower bound on travel time in seconds).
+ *   Pass the graph's real maximum; the 130 km/h default overestimates on faster roads.
  */
-export const astar: RoutingAlgorithmFn = (graph, start, end, getWeight, getCoord, metric) => {
+export const astar: RoutingAlgorithmFn = (
+  graph,
+  start,
+  end,
+  getWeight,
+  getCoord,
+  metric,
+  context,
+) => {
   if (!getCoord) return null;
+  const maxSpeedMps = context?.maxSpeedMps ?? DEFAULT_MAX_SPEED_MPS;
 
   const endCoord = getCoord(end);
   if (!endCoord) return null;
@@ -136,7 +146,7 @@ export const astar: RoutingAlgorithmFn = (graph, start, end, getWeight, getCoord
     const coord = getCoord(nodeIndex);
     if (!coord) return 0;
     const distance = haversineDistance(endCoord, coord);
-    return metric === "time" ? distance / MAX_SPEED_MS : distance;
+    return metric === "time" ? distance / maxSpeedMps : distance;
   };
 
   return shortestPath(graph, start, end, getWeight, heuristic);

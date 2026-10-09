@@ -24,7 +24,7 @@ export function InfoTooltip({
       <Popover.Trigger
         aria-label={label}
         className={cn(
-          "inline-flex min-h-6 min-w-6 items-center justify-center shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText]",
+          "inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full p-0.5 text-muted-foreground focus-ring transition-colors hover:text-foreground",
           className,
         )}
         closeDelay={100}
@@ -42,7 +42,7 @@ export function InfoTooltip({
           sideOffset={6}
         >
           <Popover.Popup
-            className="w-max max-w-72 rounded-md border bg-popover p-2 font-normal text-popover-foreground shadow-md transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0"
+            className="w-max max-w-72 rounded-md border bg-popover p-2 font-normal text-popover-foreground shadow-modal transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0"
             data-slot="info-tooltip-content"
             initialFocus={false}
           >

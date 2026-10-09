@@ -25,7 +25,7 @@ import type {
  * Router for finding paths through OSM road networks.
  *
  * Uses pathfinding algorithms (Dijkstra, A*, or bidirectional) to find
- * routes between node indexes. Use `findNearestNodeOnGraph()` to snap
+ * routes between node indexes. Use `graph.findNearestRoutableNode()` to snap
  * arbitrary coordinates to routable nodes before calling `route()`.
  *
  * @example
@@ -76,6 +76,10 @@ export class Router {
       (edge) => (metric === "distance" ? edge.distance : edge.time),
       (nodeIndex) => this.osm.nodes.getNodeLonLat({ index: nodeIndex }),
       metric,
+      {
+        reverseGraph: (nodeIndex) => this.graph.getIncomingEdges(nodeIndex),
+        maxSpeedMps: this.graph.maxSpeedMps,
+      },
     );
   }
 

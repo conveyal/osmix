@@ -69,10 +69,6 @@ type ViewerState =
     }
   | { kind: "error"; message: string };
 
-function isValidBounds(bounds: GeoBbox2D): boolean {
-  return bounds.every(Number.isFinite) && bounds[0] <= bounds[2] && bounds[1] <= bounds[3];
-}
-
 function truncate(text: string, width: number): string {
   if (text.length <= width) return text;
   if (width <= 1) return text.slice(0, width);
@@ -267,7 +263,7 @@ export class TerminalMapViewer {
   }
 
   setDataset(info: OsmInfo, tileRenderer: StyledTileRenderer): void {
-    if (!isValidBounds(info.bbox)) throw Error("The PBF contains no nodes to display.");
+    if (info.bbox === null) throw Error("The PBF contains no nodes to display.");
     this.dataBounds = info.bbox;
     const tiles = this.vectorSurface
       ? null

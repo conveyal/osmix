@@ -6,12 +6,17 @@ import { around as geoAround } from "geoflatbush";
 
 import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
+import { MAX_UINT32_OFFSET, MAX_WAY_REFS, assertCapacity } from "./limits.ts";
 import type { Nodes } from "./nodes.ts";
 import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
 import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
 
-const MISSING_NODE_INDEX = 0xffffffff;
+/**
+ * Node-index sentinel stored for way refs whose node is not present in the dataset.
+ * Returned by {@link Ways.getRefIndexes} in place of a node index.
+ */
+export const MISSING_NODE_INDEX = 0xffffffff;
 const HASH_REF_CHUNK_SIZE = 8192;
 
 export interface WaysTransferables<
@@ -36,7 +41,7 @@ export class Ways extends Entities<OsmWay> {
   private spatialIndexBuilt = false;
 
   private refStart: RTA<Uint32Array>;
-  private refCount: RTA<Uint16Array>; // Maximum 2,000 nodes per way
+  private refCount: RTA<Uint16Array>; // Maximum MAX_WAY_REFS (65,535) nodes per way
 
   // Node indexes. Missing node IDs are preserved in sparse parallel arrays.
   private refs: RTA<Uint32Array>;
@@ -106,6 +111,7 @@ export class Ways extends Entities<OsmWay> {
    * Add a single way to the index.
    */
   addWay(way: OsmWay) {
+    this.assertRefCapacity(way.id, way.refs.length);
     const wayIndex = this.addEntity(way.id, way.tags ?? {});
     this.refStart.push(this.refLength);
     this.refCount.push(way.refs.length);
@@ -148,8 +154,9 @@ export class Ways extends Entities<OsmWay> {
         : null;
       if (filter && filteredWay === null) continue;
 
-      this.addEntity(way.id, tagKeys, tagValues);
       const addedRefs = filteredWay?.refs ?? refs;
+      this.assertRefCapacity(way.id, addedRefs.length);
+      this.addEntity(way.id, tagKeys, tagValues);
       this.refStart.push(this.refLength);
       this.refCount.push(addedRefs.length);
       this.appendRefIds(addedRefs, nodeIdToIndex);
@@ -196,9 +203,11 @@ export class Ways extends Entities<OsmWay> {
   /**
    * Build the spatial index for ways.
    * If bbox data already exists (e.g., loaded from storage), reuses it.
+   * Returns the existing index when it is already built.
    */
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
+    if (this.spatialIndexBuilt) return this.spatialIndex;
     if (this.size === 0) {
       this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
       this.spatialIndexBuilt = true;
@@ -283,6 +292,18 @@ export class Ways extends Entities<OsmWay> {
     const refs = Array.from<number>({ length: count });
     for (let i = 0; i < count; i++) refs[i] = this.getRefId(start + i);
     return refs;
+  }
+
+  /**
+   * Get the node indexes referenced by a way without allocating.
+   *
+   * Returns a view into internal storage; do not mutate it or hold it across writes. Refs to
+   * nodes absent from the dataset are {@link MISSING_NODE_INDEX}. Requires `buildEntityIndex()`.
+   */
+  getRefIndexes(index: number): Uint32Array {
+    if (this.pendingRefIds !== null) throw Error("Way index is not built.");
+    const start = this.refStart.at(index);
+    return this.refs.array.subarray(start, start + this.refCount.at(index));
   }
 
   /**
@@ -445,7 +466,7 @@ export class Ways extends Entities<OsmWay> {
   /**
    * Get the approximate memory requirements for a given number of ways in bytes.
    */
-  static getBytesRequired(count: number, refCount = 0, missingRefCount = 0) {
+  static getBytesRequired(count: number, refCount = 0, missingRefCount = 0, tagCount = 0) {
     if (count === 0) return 0;
     // Approximate nodes per way
     let numNodes = count;
@@ -460,7 +481,7 @@ export class Ways extends Entities<OsmWay> {
 
     return (
       Ids.getBytesRequired(count) +
-      Tags.getBytesRequired(count) +
+      Tags.getBytesRequired(count, count, tagCount) +
       count * Uint32Array.BYTES_PER_ELEMENT + // refStart
       count * Uint16Array.BYTES_PER_ELEMENT + // refCount
       refCount * Uint32Array.BYTES_PER_ELEMENT + // node indexes
@@ -489,6 +510,17 @@ export class Ways extends Entities<OsmWay> {
   }
 
   /** Logical reference length during either pending-ID or indexed ingestion. */
+  /** Reject a way whose ref count would wrap `refCount` or the `refStart` offsets. */
+  private assertRefCapacity(wayId: number, refCount: number) {
+    assertCapacity("way-refs", refCount, MAX_WAY_REFS, () => `Way ${wayId}`);
+    assertCapacity(
+      "total-way-refs",
+      this.refLength + refCount,
+      MAX_UINT32_OFFSET,
+      () => `The dataset (at way ${wayId})`,
+    );
+  }
+
   private get refLength(): number {
     return this.pendingRefIds?.length ?? this.refs.length;
   }

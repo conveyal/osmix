@@ -3,14 +3,12 @@ import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import {
-  applyChangesetToOsm,
   discoverConflationCandidates,
-  generateConflationArtifacts,
-  generateConflationChangeset,
-  generateChangeset,
+  merge,
   type OsmConflationDecision,
   type OsmConflationOptions,
 } from "../src/index.ts";
+import { findProposal, planAndApply, withMatchingDecisions } from "./helpers/plan.ts";
 
 function createOsm(
   id: string,
@@ -29,13 +27,30 @@ function createOsm(
 
 const propertyOptions: OsmConflationOptions = { propertyKeys: ["name"], attachNetwork: false };
 
+/**
+ * Plan and apply a matching merge, with the same merge without matching as the baseline.
+ * Identical points merge only when `stages.mergeIdenticalPoints` is set.
+ */
 function generate(
   base: Osm,
   patch: Osm,
   conflation = propertyOptions,
   decisions: OsmConflationDecision[] = [],
+  stages: { mergeIdenticalPoints?: boolean; createIntersections?: boolean } = {},
 ) {
-  return generateConflationArtifacts(base, patch, { directMerge: true, conflation }, decisions);
+  const options = {
+    mergeIdenticalPoints: stages.mergeIdenticalPoints ?? false,
+    createIntersections: stages.createIntersections ?? false,
+  };
+  const { plan, osm: result } = planAndApply(
+    base,
+    patch,
+    withMatchingDecisions(base, patch, { ...options, matching: conflation }, decisions),
+  );
+  const outcome = plan.matching?.outcome;
+  if (!outcome) throw Error("The plan has no matching outcome");
+  const ordinaryBaseline = planAndApply(base, patch, options).osm;
+  return { plan, outcome, result, ordinaryBaseline };
 }
 
 function propertyPair() {
@@ -45,7 +60,7 @@ function propertyPair() {
 }
 
 describe("actual conflation outcomes", () => {
-  it("reports actual tag copies and keeps the public changeset return compatible", () => {
+  it("reports actual tag copies that the merge also makes", async () => {
     const { base, patch } = propertyPair();
     const { outcome, ordinaryBaseline, result } = generate(base, patch);
     expect(ordinaryBaseline.nodes.getById(1)?.tags?.["name"]).toBe("Old");
@@ -63,11 +78,13 @@ describe("actual conflation outcomes", () => {
     expect(outcome.features).toMatchObject([
       { entityType: "node", sourceId: 101, copiedKeys: ["name"], unresolved: null },
     ]);
-    const changeset = generateConflationChangeset(base, patch, {
-      directMerge: true,
-      conflation: propertyOptions,
-    });
-    expect(applyChangesetToOsm(changeset).nodes.getById(1)).toEqual(result.nodes.getById(1));
+    const merged = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: propertyOptions },
+      () => {},
+    );
+    expect(merged.nodes.getById(1)).toEqual(result.nodes.getById(1));
   });
 
   it("counts one copy action per source with multiple changed keys and keeps partial failures", () => {
@@ -257,7 +274,7 @@ describe("actual conflation outcomes", () => {
     expect(outcome.features[0]?.connectedWayIds).toEqual([20, 21]);
   });
 
-  it("does not credit fuzzy matching for refs already reconciled by the ordinary exact merge", () => {
+  it("does not credit matching for points the identical-point merge reconciled", () => {
     const base = createOsm(
       "base",
       [
@@ -275,34 +292,32 @@ describe("actual conflation outcomes", () => {
       ],
       [{ id: 20, refs: [101, 3], tags: { highway: "footway" } }],
     );
-    const options = {
-      directMerge: true,
-      deduplicateNodes: true,
-      conflation: { propertyKeys: ["name"], attachNetwork: true },
-    };
-    const discovery = discoverConflationCandidates(base, patch, options.conflation);
+    const conflation = { propertyKeys: ["name"], attachNetwork: true };
+    const discovery = discoverConflationCandidates(base, patch, conflation);
     expect(discovery.candidates[0]?.networkAttachment?.status).toBe("automatic");
-    const { outcome, ordinaryBaseline, result } = generateConflationArtifacts(base, patch, options);
+    const { plan, outcome, ordinaryBaseline, result } = generate(base, patch, conflation, [], {
+      mergeIdenticalPoints: true,
+    });
     expect(ordinaryBaseline.ways.getById(20)?.refs).toEqual([1, 3]);
     expect(result.ways.getById(20)?.refs).toEqual([1, 3]);
     expect(ordinaryBaseline.nodes.getById(1)?.tags?.["name"]).toBe("Already imported");
+    // The identical-point merge consumes the imported point, so it is no matching source.
+    expect(findProposal(plan, "exact:n101>n1").effect).toBe("applied");
+    expect([...plan.proposals.values()].some((proposal) => "candidateId" in proposal)).toBe(false);
     expect(outcome.tags[0]).toMatchObject({
+      presentFeatures: 0,
       copiedFeatures: 0,
-      alreadyEqualFeatures: 1,
+      alreadyEqualFeatures: 0,
       uncopied: [],
     });
     expect(outcome.summary).toMatchObject({
-      features: 1,
+      features: 0,
       appliedFeatures: 0,
       networkAttachmentActions: 0,
       unresolvedFeatures: 0,
-      unchangedFeatures: 1,
+      unchangedFeatures: 0,
     });
-    expect(outcome.features[0]).toMatchObject({
-      connectedWayIds: [],
-      retained: false,
-      ordinaryAddition: false,
-    });
+    expect(outcome.features).toEqual([]);
     expect(outcome.retainedImports).toEqual({
       originalIds: { nodes: 1, ways: 1, relations: 0 },
       ordinaryAdditions: { nodes: 0, ways: 1, relations: 0 },
@@ -390,7 +405,7 @@ describe("actual conflation outcomes", () => {
   });
 
   it.each(["uncontrolled", "traffic_signals", "no"])(
-    "preserves the reported crossing=%s value through later intersection creation",
+    "preserves the reported crossing=%s value through intersection creation",
     (crossing) => {
       const base = createOsm(
         "base",
@@ -424,9 +439,20 @@ describe("actual conflation outcomes", () => {
       );
       expect(result.nodes.getById(1)?.tags?.["crossing"]).toBe(crossing);
       expect(outcome.features[0]).toMatchObject({ copiedKeys: ["crossing"], unresolved: null });
-      const final = applyChangesetToOsm(
-        generateChangeset(result, patch, { createIntersections: true }, () => {}),
-      );
+      const final = generate(
+        base,
+        patch,
+        { propertyKeys: ["crossing"], attachNetwork: false },
+        [
+          {
+            candidateId: "node:101->1",
+            action: "accept",
+            transferProperties: true,
+            attachNetwork: false,
+          },
+        ],
+        { createIntersections: true },
+      ).result;
       expect(final.ways.getById(20)?.refs).toEqual([103, 1, 104]);
       expect(final.nodes.getById(1)?.tags?.["crossing"]).toBe(crossing);
     },
@@ -473,7 +499,8 @@ describe("actual conflation outcomes", () => {
     expect(outcome.summary).toMatchObject({
       features: 2,
       appliedFeatures: 0,
-      unresolvedFeatures: 2,
+      // The remote point has nothing nearby: an outcome, not unresolved work (MP-OUT1).
+      unresolvedFeatures: 1,
       reviewFeatures: 1,
       unmatchedFeatures: 1,
     });

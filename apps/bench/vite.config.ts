@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import react from "@vitejs/plugin-react";
-import { preview } from "@vitest/browser-preview";
+import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -14,6 +14,9 @@ export default defineConfig({
     },
   },
   server: {
+    host: process.env.HOST,
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
+    strictPort: process.env.PORT !== undefined,
     headers: {
       "Cross-Origin-Embedder-Policy": "require-corp",
       "Cross-Origin-Opener-Policy": "same-origin",
@@ -23,13 +26,14 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@duckdb/duckdb-wasm"],
     rolldownOptions: {
-      target: "esnext",
+      transform: { target: "esnext" },
     },
   },
   test: {
     browser: {
       enabled: process.env.CI !== "true",
-      provider: preview(),
+      provider: playwright(),
+      headless: true,
       instances: [
         {
           browser: "chromium",

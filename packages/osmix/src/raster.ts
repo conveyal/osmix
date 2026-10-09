@@ -12,6 +12,7 @@ import { wayIsArea } from "@osmix/geo/way-is-area";
 import {
   DEFAULT_AREA_COLOR,
   DEFAULT_LINE_COLOR,
+  DEFAULT_POINT_COLOR,
   DEFAULT_RASTER_TILE_SIZE,
   OsmixRasterTile,
 } from "@osmix/raster";
@@ -45,9 +46,6 @@ export function drawToRasterTile(osm: Osm, tile: Tile, opts?: DrawToRasterTileOp
   const rasterTile = new OsmixRasterTile({ tile, tileSize });
   const bbox = rasterTile.bbox();
 
-  // Get way IDs that are part of relations (to exclude from individual rendering)
-  const relationWayIds = osm.relations.getWayMemberIds();
-
   // Draw relations by kind
   osm.relations.intersects(bbox, (relIndex) => {
     // Try fast path: check if relation bbox fits in a single pixel
@@ -60,16 +58,16 @@ export function drawToRasterTile(osm: Osm, tile: Tile, opts?: DrawToRasterTileOp
 
     if (geometry.rings) {
       // Area relations (multipolygon, boundary)
-      rasterTile.drawMultiPolygon(geometry.rings);
+      rasterTile.drawMultiPolygon(geometry.rings, opts?.areaColor ?? DEFAULT_AREA_COLOR);
     } else if (geometry.lineStrings) {
       // Line relations (route, multilinestring)
       for (const lineString of geometry.lineStrings) {
-        rasterTile.drawLineString(lineString);
+        rasterTile.drawLineString(lineString, opts?.lineColor ?? DEFAULT_LINE_COLOR);
       }
     } else if (geometry.points) {
       // Point relations (multipoint)
       for (const point of geometry.points) {
-        rasterTile.drawPoint(point);
+        rasterTile.drawPoint(point, opts?.pointColor ?? DEFAULT_POINT_COLOR);
       }
     }
     return false;
@@ -77,7 +75,7 @@ export function drawToRasterTile(osm: Osm, tile: Tile, opts?: DrawToRasterTileOp
 
   // Draw ways (excluding those that are part of relations)
   osm.ways.intersects(bbox, (wayIndex) => {
-    if (relationWayIds.has(osm.ways.ids.at(wayIndex))) return false;
+    if (osm.relations.isWayMember(wayIndex)) return false;
     const way = osm.ways.getByIndex(wayIndex);
     const tagColor = hexColorToRgba(way.tags?.["color"] ?? way.tags?.["colour"]);
     const lineColor: Rgba = tagColor

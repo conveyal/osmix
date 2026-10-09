@@ -1,5 +1,6 @@
 import type { Osm } from "@osmix/core";
 
+import { inputProvenance } from "./provenance.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
@@ -15,12 +16,15 @@ import type {
   OsmConflationUnresolvedKind,
   OsmConflationWayRemovalPreview,
 } from "./types.ts";
+import type { DatasetReader } from "./views.ts";
 
 /** Actual changing writers, rather than assignments that merely repeat an existing value. */
 export interface ConflationApplicationTrace {
   tagWriters: Map<string, string>;
   alreadyEqualTagValues: Set<string>;
   wayRemovals?: Map<string, OsmConflationWayRemovalPreview>;
+  /** Imported nodes a connection left unreferenced (their tags merged), so they were dropped. */
+  connectionOrphanNodeIds: Set<number>;
 }
 
 export function conflationTagTargetKey(candidate: OsmConflationCandidate, key: string): string {
@@ -31,7 +35,7 @@ export function conflationTagSourceKey(candidate: OsmConflationCandidate, key: s
   return `${candidate.id}:${key}`;
 }
 
-function entity(osm: Osm, entityType: OsmConflationEntityType, id: number) {
+function entity(osm: DatasetReader, entityType: OsmConflationEntityType, id: number) {
   return entityType === "node" ? osm.nodes.getById(id) : osm.ways.getById(id);
 }
 
@@ -46,8 +50,8 @@ function explicitlySkipped(decision: OsmConflationDecision | undefined): boolean
 }
 
 function actualWayRemoval(
-  baseline: Osm,
-  result: Osm,
+  baseline: DatasetReader,
+  result: DatasetReader,
   preview: OsmConflationWayRemovalPreview | undefined,
 ): OsmConflationWayRemovalPreview | undefined {
   if (!preview || !baseline.ways.ids.has(preview.sourceWayId)) return undefined;
@@ -74,7 +78,8 @@ function actualWayRemoval(
   };
 }
 
-function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
+function retainedImports(base: Osm, patch: Osm, baseline: DatasetReader, result: DatasetReader) {
+  const provenance = inputProvenance(base, patch);
   const counts: OsmConflationRetainedImports = {
     originalIds: { nodes: 0, ways: 0, relations: 0 },
     ordinaryAdditions: { nodes: 0, ways: 0, relations: 0 },
@@ -83,7 +88,8 @@ function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
     for (const source of patch[type]) {
       if (!result[type].ids.has(source.id)) continue;
       counts.originalIds[type]++;
-      if (!base[type].ids.has(source.id) && baseline[type].ids.has(source.id))
+      const kind = type === "nodes" ? "node" : type === "ways" ? "way" : "relation";
+      if (provenance.isImported(kind, source.id) && baseline[type].ids.has(source.id))
         counts.ordinaryAdditions[type]++;
     }
   }
@@ -121,12 +127,24 @@ function unresolvedKind(
   return "review";
 }
 
+/** One frozen empty list for every empty one: most entries of a large report have none. */
+export const NO_ITEMS = Object.freeze([]) as never[];
+
+/**
+ * `items` as a list, or the shared empty one. An outcome feature's lists are empty for most
+ * imported features: on Washington, 1.1 million of 1.5 million (T35).
+ */
+function listOf<T>(items: readonly T[] | ReadonlySet<T>): T[] {
+  if (Array.isArray(items)) return items.length > 0 ? (items as T[]) : NO_ITEMS;
+  return (items as ReadonlySet<T>).size > 0 ? [...items] : NO_ITEMS;
+}
+
 /** Build a detached report only after successful application and integrity validation. */
 export function createConflationOutcomeReport(
   base: Osm,
   patch: Osm,
-  ordinaryBaseline: Osm,
-  result: Osm,
+  ordinaryBaseline: DatasetReader,
+  result: DatasetReader,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
   trace: ConflationApplicationTrace,
@@ -146,9 +164,10 @@ export function createConflationOutcomeReport(
   // Unmatched candidates have no attachment evidence. Inspect actual ordinary
   // imports too, so an unattached endpoint is still reported as unresolved.
   const sourceWays = new Map<number, number[]>();
+  const provenance = inputProvenance(base, patch);
   if (discovery.options.attachNetwork) {
     for (const importedWay of patch.ways) {
-      if (base.ways.ids.has(importedWay.id)) continue;
+      if (!provenance.isImported("way", importedWay.id)) continue;
       const way = ordinaryBaseline.ways.getById(importedWay.id);
       if (!way) continue;
       for (const sourceId of new Set(way.refs)) {
@@ -264,7 +283,7 @@ export function createConflationOutcomeReport(
       const tagReasons = targetCandidate
         ? targetCandidate.propertyTransfer.reasons
         : candidates.flatMap((candidate) => candidate.propertyTransfer.reasons);
-      tag.uncopied.push({ entityType, sourceId, reason, reasons: [...new Set(tagReasons)] });
+      tag.uncopied.push({ entityType, sourceId, reason, reasons: listOf(new Set(tagReasons)) });
       if (reason !== "not-selected") failedTags.push(reason);
     }
     const connectedWayIds: number[] = [];
@@ -302,8 +321,8 @@ export function createConflationOutcomeReport(
       sourceId,
       candidateIds: candidates.map((candidate) => candidate.id),
       targetId,
-      copiedKeys,
-      connectedWayIds,
+      copiedKeys: listOf(copiedKeys),
+      connectedWayIds: listOf(connectedWayIds),
       unresolved,
       skipped,
       retained,
@@ -311,7 +330,7 @@ export function createConflationOutcomeReport(
         retained &&
         entity(base, entityType, sourceId) == null &&
         entity(ordinaryBaseline, entityType, sourceId) != null,
-      reasons: [...reasons],
+      reasons: listOf(reasons),
       ...(wayRemoval ? { wayRemoval } : {}),
     });
   }
@@ -328,7 +347,13 @@ export function createConflationOutcomeReport(
       copiedTagValues: features.reduce((count, feature) => count + feature.copiedKeys.length, 0),
       networkAttachmentActions: features.filter((feature) => feature.connectedWayIds.length > 0)
         .length,
-      unresolvedFeatures: features.filter((feature) => feature.unresolved != null).length,
+      removedConnectionOrphanNodes: [...trace.connectionOrphanNodeIds].filter(
+        (id) => ordinaryBaseline.nodes.ids.has(id) && !result.nodes.ids.has(id),
+      ).length,
+      // Nothing nearby is an outcome, not work left to do (MP-OUT1).
+      unresolvedFeatures: features.filter(
+        (feature) => feature.unresolved != null && feature.unresolved !== "unmatched",
+      ).length,
       ambiguousFeatures: features.filter((feature) => feature.unresolved === "ambiguous").length,
       blockedFeatures: features.filter((feature) => feature.unresolved === "blocked").length,
       unmatchedFeatures: features.filter((feature) => feature.unresolved === "unmatched").length,

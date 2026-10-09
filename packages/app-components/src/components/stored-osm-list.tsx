@@ -1,8 +1,13 @@
 import {
+  isPbfFile,
+  type OsmFileSizeGuidance,
+  osmFileSizeGuidance,
+  reportedDeviceMemoryBytes,
   type StoredOsmEntry,
   useStoredOsm,
   osmLoadProfileAtomFamily,
   osmLoadingAbortControllerAtom,
+  useTasks,
 } from "@osmix/app-core";
 import type { OsmLoadFailure } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
@@ -12,10 +17,7 @@ import {
   DetailsContent,
   DetailsSummary,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  IconButton,
   Input,
   Item,
   ItemActions,
@@ -28,14 +30,13 @@ import {
  * UI component for managing stored Osm data in IndexedDB.
  * Uses BroadcastChannel to receive updates from the worker.
  */
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import {
   CheckIcon,
+  CircleStopIcon,
   DatabaseIcon,
-  FilesIcon,
   PencilIcon,
   RotateCcwIcon,
-  StopCircleIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -43,9 +44,10 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 
+import { OsmFileSizeWarning } from "./osm-file-size-warning.tsx";
 import { OsmLoadFailurePanel } from "./osm-load-failure.tsx";
 import {
-  OsmLoadProfileSelector,
+  OsmLoadProfileDisclosure,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
 } from "./osm-pbf-file-input.tsx";
@@ -129,7 +131,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   });
 
   return (
-    <Item className={isActive ? "bg-info/5 border-info/30" : ""}>
+    <Item role="listitem" variant="row" aria-current={isActive ? "true" : undefined}>
       <ItemHeader>
         {isRenaming ? (
           <Input
@@ -138,52 +140,47 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleConfirmRename}
-            className="h-7 font-bold"
+            aria-label="File name"
+            className="h-7"
           />
         ) : (
-          <ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+          <ItemTitle className="min-w-0 truncate font-mono">{entry.fileName}</ItemTitle>
         )}
 
         <ItemActions>
           {isRenaming ? (
             <>
-              <Button
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Confirm rename"
+                label="Confirm rename"
+                icon={<CheckIcon aria-hidden="true" />}
                 onClick={handleConfirmRename}
-              >
-                <CheckIcon />
-              </Button>
-              <Button
+              />
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Cancel rename"
+                label="Cancel rename"
+                icon={<XIcon aria-hidden="true" />}
                 onClick={handleCancelRename}
-              >
-                <XIcon />
-              </Button>
+              />
             </>
           ) : (
             <>
-              <Button
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Rename file"
+                label="Rename file"
+                icon={<PencilIcon aria-hidden="true" />}
                 onClick={handleStartRename}
-              >
-                <PencilIcon />
-              </Button>
+              />
               <ActionButton
                 variant="outline"
-                title="Restore from storage"
-                icon={<RotateCcwIcon />}
+                label="Restore from storage"
+                icon={<RotateCcwIcon aria-hidden="true" />}
                 onAction={() => onLoad(entry.fileHash)}
               />
               <ActionButton
                 variant="outline"
-                title="Delete from storage"
-                icon={<Trash2Icon />}
+                label="Delete from storage"
+                icon={<Trash2Icon aria-hidden="true" />}
                 disabled={isDeleting}
                 onAction={handleDelete}
               />
@@ -191,7 +188,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
           )}
         </ItemActions>
       </ItemHeader>
-      <ItemContent className="text-muted-foreground">
+      <ItemContent className="font-mono text-muted-foreground">
         {formatStats(entry.info)} &middot; {formatDate(entry.lastAccessedAt)}
       </ItemContent>
     </Item>
@@ -206,8 +203,32 @@ interface StoredOsmListProps {
   osmKey?: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
   openOsmPbfUrl?: (url: string) => Promise<OsmInfo | null>;
+  /**
+   * Cut a region out of a PBF that is too large for this page, without loading it. Offered in
+   * the size warning when present.
+   */
+  onOpenInExtract?: (file: File) => unknown;
+  /**
+   * Whether to warn, before loading, about a PBF whose size predicts View mode or a failure.
+   * Defaults to true. Off where a PBF is streamed rather than loaded (Extract's source).
+   */
+  warnLargePbf?: boolean;
+  /** Whether "Open file" is the next step, and so the primary button. Defaults to true. */
+  primary?: boolean;
 }
 
+/** A picked file held back by the size warning until the user chooses what to do. */
+interface HeldFile {
+  file: File;
+  fileType?: OsmFileType;
+  guidance: Exclude<OsmFileSizeGuidance, { level: "full" }>;
+}
+
+/**
+ * Open a file or URL, pick the load profile, and restore from the files stored in IndexedDB.
+ * It has no frame of its own: place it in a `flush` `SidebarSection`, whose title names the slot
+ * it fills. The stored files are a divided list that reaches the section edges.
+ */
 export function StoredOsmList({
   activeOsmId,
   loadFailure,
@@ -216,92 +237,126 @@ export function StoredOsmList({
   osmKey,
   openOsmFile,
   openOsmPbfUrl,
+  onOpenInExtract,
+  warnLargePbf = true,
+  primary = true,
 }: StoredOsmListProps) {
   const remote = useOsmixRemote();
   const { entries, estimatedBytes } = useStoredOsm(remote);
-  const [loadingState, setLoadingState] = useAtom(osmLoadingAbortControllerAtom);
+  const loadingState = useAtomValue(osmLoadingAbortControllerAtom);
+  const { current } = useTasks();
   const [loadProfile, setLoadProfile] = useAtom(osmLoadProfileAtomFamily(osmKey ?? "default"));
   const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey);
+  const [heldFile, setHeldFile] = useState<HeldFile | null>(null);
+
+  /** Load a picked file, or hold a large PBF back behind the size warning. */
+  const openPickedFile = async (file: File, fileType?: OsmFileType) => {
+    setHeldFile(null);
+    if (warnLargePbf && isPbfFile(file, fileType)) {
+      const guidance = osmFileSizeGuidance(file.size, reportedDeviceMemoryBytes());
+      // A View-sized file needs no warning when the user already chose View.
+      const expected = guidance.level === "view" && loadProfile === "view";
+      if (guidance.level !== "full" && !expected) {
+        setHeldFile({ file, fileType, guidance });
+        return;
+      }
+    }
+    await openOsmFile(file, fileType);
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <FilesIcon className="size-3" />
-          Files
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="flex flex-col lg:flex-row gap-2 p-2 items-stretch">
-          {isLoading ? (
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => {
-                loadingState.controller.abort();
-                setLoadingState(null);
+    <>
+      <div className="flex flex-col gap-1 px-inset pb-inset">
+        {isLoading ? (
+          <Button
+            variant="destructive"
+            className="w-full"
+            // The load holds the task lock until it actually stops, then clears this state.
+            disabled={current?.status === "cancelling"}
+            onClick={() => loadingState.controller.abort()}
+          >
+            <CircleStopIcon aria-hidden="true" />
+            {current?.status === "cancelling" ? "Cancelling…" : "Cancel loading"}
+          </Button>
+        ) : (
+          <>
+            <OsmPbfSelectFileButton
+              primary={primary}
+              setFile={async (file, fileType) => {
+                if (file == null) return;
+                await openPickedFile(file, fileType);
               }}
-            >
-              <StopCircleIcon className="mr-2 h-4 w-4" />
-              Cancel Loading
-            </Button>
-          ) : (
-            <>
-              <OsmPbfSelectFileButton
-                setFile={async (file, fileType) => {
-                  if (file == null) return;
-                  await openOsmFile(file, fileType);
-                }}
-              />
-              <OsmPbfOpenUrlButton
-                openPbfUrl={openOsmPbfUrl}
-                setFile={async (file, fileType) => {
-                  if (file == null) return;
-                  await openOsmFile(file, fileType);
-                }}
-              />
-            </>
-          )}
-        </div>
-        {!isLoading ? (
-          <div className="px-2 pb-2">
-            <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
-          </div>
-        ) : null}
-        {loadFailure && onDismissLoadFailure ? (
-          <OsmLoadFailurePanel
-            failure={loadFailure}
-            onDismiss={onDismissLoadFailure}
-            onReloadView={onReloadView}
-          />
-        ) : null}
-        {entries.length > 0 && (
-          <Details>
-            <DetailsSummary>
-              <div className="flex items-center gap-2">
-                <DatabaseIcon className="size-3" /> <div>Stored</div>
-                <span className="text-muted-foreground">
-                  &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
-                </span>
-              </div>
-            </DetailsSummary>
-            <DetailsContent>
-              <ItemGroup>
-                {entries.map((entry) => (
-                  <StoredOsmItem
-                    key={entry.fileHash}
-                    entry={entry}
-                    onLoad={openOsmFile}
-                    isActive={entry.fileHash === activeOsmId}
+            />
+            <OsmLoadProfileDisclosure
+              value={loadProfile}
+              onChange={setLoadProfile}
+              trigger={(toggle) => (
+                <div className="flex items-center justify-between gap-2">
+                  <OsmPbfOpenUrlButton
+                    openPbfUrl={openOsmPbfUrl}
+                    setFile={async (file, fileType) => {
+                      if (file == null) return;
+                      await openPickedFile(file, fileType);
+                    }}
                   />
-                ))}
-              </ItemGroup>
-            </DetailsContent>
-          </Details>
+                  {toggle}
+                </div>
+              )}
+            />
+          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+      {heldFile ? (
+        <OsmFileSizeWarning
+          className="mx-inset mb-inset"
+          fileName={heldFile.file.name}
+          guidance={heldFile.guidance}
+          onCancel={() => setHeldFile(null)}
+          onLoadAnyway={async () => {
+            setHeldFile(null);
+            await openOsmFile(heldFile.file, heldFile.fileType);
+          }}
+          onOpenInExtract={
+            onOpenInExtract
+              ? () => {
+                  setHeldFile(null);
+                  return onOpenInExtract(heldFile.file);
+                }
+              : undefined
+          }
+        />
+      ) : null}
+      {loadFailure && onDismissLoadFailure ? (
+        <OsmLoadFailurePanel
+          className="mx-inset mb-inset"
+          failure={loadFailure}
+          onDismiss={onDismissLoadFailure}
+          onReloadView={onReloadView}
+        />
+      ) : null}
+      {entries.length > 0 && (
+        <Details>
+          <DetailsSummary>
+            <DatabaseIcon aria-hidden="true" className="size-3.5" />
+            Stored
+            <span className="text-muted-foreground">
+              &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
+            </span>
+          </DetailsSummary>
+          <DetailsContent>
+            <ItemGroup>
+              {entries.map((entry) => (
+                <StoredOsmItem
+                  key={entry.fileHash}
+                  entry={entry}
+                  onLoad={openOsmFile}
+                  isActive={entry.fileHash === activeOsmId}
+                />
+              ))}
+            </ItemGroup>
+          </DetailsContent>
+        </Details>
+      )}
+    </>
   );
 }
-
-export default StoredOsmList;

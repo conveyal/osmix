@@ -1,5 +1,5 @@
-import { selectOsmEntityAtom } from "@osmix/app-core";
-import { useSetAtom } from "jotai";
+import { mapModeAtom, type SelectionOrigin, selectOsmEntityAtom } from "@osmix/app-core";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   type ExpressionSpecification,
   type FillLayerSpecification,
@@ -9,7 +9,7 @@ import {
 } from "maplibre-gl";
 import type { Osm } from "osmix";
 import { decodeZigzag } from "osmix";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef } from "react";
 import {
   type CircleLayerSpecification,
   Layer,
@@ -18,70 +18,82 @@ import {
 } from "react-map-gl/maplibre";
 
 import { APPID, MIN_PICKABLE_ZOOM } from "../constants.ts";
+import { type MapColors, useMapColors } from "../hooks/map-colors.ts";
 import { useMap } from "../hooks/map.ts";
 import { osmixIdToTileUrl } from "../lib/osmix-vector-protocol.ts";
 
 const DEFAULT_TOOLTIP_CLASS = "osmix-overlay-tooltip";
 
+/** A faded dataset's opacity: still readable as context, clearly behind the page's layers. */
+export const FADED_OPACITY = 0.4;
+
 const tooltipTemplate = ({ id, type }: { id: number; type: string }) =>
   `<div class="${DEFAULT_TOOLTIP_CLASS}">${type}/${id}</div>`;
 
-const wayBaseColorExpression: ExpressionSpecification = [
-  "case",
-  ["has", "color"],
-  ["to-color", ["get", "color"]],
-  ["rgba", 255, 255, 255, 1],
-];
+/** Which dataset an overlay draws: the base dataset or a patch being merged into it. */
+export type OsmixOverlayRole = "base" | "patch";
 
-const waysPaint: LineLayerSpecification["paint"] = {
-  "line-color": [
-    "case",
-    ["boolean", ["feature-state", "hover"], false],
-    ["rgba", 255, 0, 0, 1],
-    wayBaseColorExpression,
-  ],
-  "line-opacity": 1,
-  "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
-};
+const isHovered: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
 
-const waysLayout: LineLayerSpecification["layout"] = {
-  "line-join": "round",
-};
+/** A feature's own `color` property when present, otherwise the dataset color. */
+function featureColor(fallback: string): ExpressionSpecification {
+  return ["case", ["has", "color"], ["to-color", ["get", "color"]], fallback];
+}
 
-const wayPolygonsPaint: FillLayerSpecification["paint"] = {
-  "fill-color": ["case", ["has", "color"], ["to-color", ["get", "color"]], "red"],
-  "fill-opacity": 0.25,
-};
+const outlineWidth: ExpressionSpecification = ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1];
 
-const wayPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
-  "line-color": ["case", ["has", "color"], ["to-color", ["get", "color"]], "red"],
-  "line-opacity": 0.5,
-  "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
-};
-
-const relationPolygonsPaint: FillLayerSpecification["paint"] = {
-  "fill-color": "blue",
-  "fill-opacity": 0.25,
-};
-
-const relationPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
-  "line-color": "blue",
-  "line-opacity": 0.5,
-  "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
-};
-
-const nodesPaint: CircleLayerSpecification["paint"] = {
-  "circle-color": ["rgba", 255, 255, 255, 1],
-  "circle-opacity": 1,
-  "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
-  "circle-stroke-color": [
-    "case",
-    ["boolean", ["feature-state", "hover"], false],
-    ["rgba", 255, 0, 0, 1],
-    ["rgba", 0, 0, 0, 0.5],
-  ],
-  "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
-};
+/**
+ * Layer paint for an overlay, colored by dataset role (see `useMapColors`). Patch lines are
+ * dashed, matching the legend; nodes stay circles for both roles because a MapLibre `circle`
+ * layer cannot draw diamonds.
+ */
+function overlayPaints(colors: MapColors, role: OsmixOverlayRole, opacity: number) {
+  const color = colors[role];
+  const dashes: Pick<LineLayerSpecification["paint"] & object, "line-dasharray"> =
+    role === "patch" ? { "line-dasharray": [1.2, 0.8] } : {};
+  const ways: LineLayerSpecification["paint"] = {
+    "line-color": ["case", isHovered, colors.hover, featureColor(color)],
+    "line-opacity": opacity,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
+    ...dashes,
+  };
+  const wayPolygons: FillLayerSpecification["paint"] = {
+    "fill-color": ["case", isHovered, colors.hover, featureColor(color)],
+    "fill-opacity": 0.25 * opacity,
+  };
+  const wayPolygonsOutline: LineLayerSpecification["paint"] = {
+    "line-color": featureColor(color),
+    "line-opacity": 0.5 * opacity,
+    "line-width": outlineWidth,
+    ...dashes,
+  };
+  const relationPolygons: FillLayerSpecification["paint"] = {
+    "fill-color": ["case", isHovered, colors.hover, color],
+    "fill-opacity": 0.25 * opacity,
+  };
+  const relationPolygonsOutline: LineLayerSpecification["paint"] = {
+    "line-color": color,
+    "line-opacity": 0.5 * opacity,
+    "line-width": outlineWidth,
+    ...dashes,
+  };
+  const nodes: CircleLayerSpecification["paint"] = {
+    "circle-color": ["case", isHovered, colors.hover, color],
+    "circle-opacity": opacity,
+    "circle-stroke-opacity": opacity,
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
+    "circle-stroke-color": colors.casing,
+    "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
+  };
+  return {
+    ways,
+    wayPolygons,
+    wayPolygonsOutline,
+    relationPolygons,
+    relationPolygonsOutline,
+    nodes,
+  };
+}
 
 const nodeFilter: FilterSpecification = ["==", ["get", "type"], "node"];
 const wayLinesFilter: FilterSpecification = ["==", ["geometry-type"], "LineString"];
@@ -89,12 +101,35 @@ const wayPolygonsFilter: FilterSpecification = ["==", ["geometry-type"], "Polygo
 
 const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"];
 
-export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
+/**
+ * Interactive vector overlay for one dataset: hover tooltips and click-to-select. `role` picks
+ * the dataset color and prefixes the source and layer ids, so one file loaded in both Merge
+ * slots never shares layers; a feature's own `color` property wins. `visible={false}` keeps the
+ * layers mounted but hidden. In route mode clicks are left to the routing tool and the cursor
+ * is not touched; hover tooltips stay.
+ */
+export default function OsmixVectorOverlay({
+  osm,
+  role = "base",
+  visible = true,
+  faded = false,
+}: {
+  osm: Osm;
+  role?: OsmixOverlayRole;
+  visible?: boolean;
+  /** Draw the dataset faded, so a page's own layers stand out above it. */
+  faded?: boolean;
+}) {
   const map = useMap();
+  const colors = useMapColors();
+  const opacity = faded ? FADED_OPACITY : 1;
+  const paints = useMemo(() => overlayPaints(colors, role, opacity), [colors, role, opacity]);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
+  const mode = useAtomValue(mapModeAtom);
   const popupRef = useRef<Popup | null>(null);
+  const visibility = visible ? "visible" : "none";
 
-  const overlayId = `${APPID}:${osm?.id}:overlay`;
+  const overlayId = `${APPID}:${role}:${osm.id}:overlay`;
   const sourceId = `${overlayId}:source`;
   const waysLayerId = `${overlayId}:ways`;
   const wayPolygonsLayerId = `${waysLayerId}:polygons`;
@@ -105,7 +140,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 
   const clearHover = useEffectEvent(() => {
     if (map) {
-      map.getCanvas().style.setProperty("cursor", "");
+      if (mode !== "route") map.getCanvas().style.setProperty("cursor", "");
       const source = map.getSource(sourceId);
       if (sourceId && source) {
         map.removeFeatureState({
@@ -127,6 +162,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
   });
 
   const handleClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
+    if (mode === "route") return;
     const feature = event.features?.[0];
     if (!osm || !feature || typeof feature.id !== "number") {
       selectEntity(null, null);
@@ -134,12 +170,14 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
     }
     // Decode zigzag-encoded ID if it was originally negative
     const decodedId = decodeZigzag(feature.id);
+    // The clicked point lets the inspector nudge the map when its panel would cover it.
+    const origin: SelectionOrigin = { source: "map", point: [event.point.x, event.point.y] };
     if (feature.properties?.type === "node") {
-      selectEntity(osm, osm.nodes.getById(decodedId));
+      selectEntity(osm, osm.nodes.getById(decodedId), origin);
     } else if (feature.properties?.type === "way") {
-      selectEntity(osm, osm.ways.getById(decodedId));
+      selectEntity(osm, osm.ways.getById(decodedId), origin);
     } else if (feature.properties?.type === "relation") {
-      selectEntity(osm, osm.relations.getById(decodedId));
+      selectEntity(osm, osm.relations.getById(decodedId), origin);
     } else {
       selectEntity(osm, null);
     }
@@ -152,7 +190,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
       clearHover();
       return;
     }
-    map.getCanvas().style.setProperty("cursor", "pointer");
+    if (mode !== "route") map.getCanvas().style.setProperty("cursor", "pointer");
     if (!popupRef.current) {
       popupRef.current = new Popup({
         closeButton: false,
@@ -233,7 +271,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
       id={sourceId}
       type="vector"
       tiles={[osmixIdToTileUrl(osm.id)]}
-      bounds={osm.bbox()}
+      bounds={osm.bbox() ?? undefined}
       minzoom={MIN_PICKABLE_ZOOM}
     >
       {/* Polygon fills - rendered first (behind everything) */}
@@ -242,28 +280,32 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
         filter={relationFilter}
         type="fill"
         {...{ "source-layer": `${sourceLayerPrefix}:relations` }}
-        paint={relationPolygonsPaint}
+        layout={{ visibility }}
+        paint={paints.relationPolygons}
       />
       <Layer
         id={`${relationPolygonsLayerId}:outline`}
         filter={relationFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:relations` }}
-        paint={relationPolygonsOutlinePaint}
+        layout={{ visibility }}
+        paint={paints.relationPolygonsOutline}
       />
       <Layer
         id={wayPolygonsLayerId}
         filter={wayPolygonsFilter}
         type="fill"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
-        paint={wayPolygonsPaint}
+        layout={{ visibility }}
+        paint={paints.wayPolygons}
       />
       <Layer
         id={`${wayPolygonsLayerId}:outline`}
         filter={wayPolygonsFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
-        paint={wayPolygonsOutlinePaint}
+        layout={{ visibility }}
+        paint={paints.wayPolygonsOutline}
       />
       {/* Way lines - rendered on top of polygon fills */}
       <Layer
@@ -271,8 +313,8 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
         filter={wayLinesFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
-        layout={waysLayout}
-        paint={waysPaint}
+        layout={{ "line-join": "round", visibility }}
+        paint={paints.ways}
       />
       {/* Nodes - rendered on top of lines */}
       <Layer
@@ -280,7 +322,8 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
         filter={nodeFilter}
         type="circle"
         {...{ "source-layer": `${sourceLayerPrefix}:nodes` }}
-        paint={nodesPaint}
+        layout={{ visibility }}
+        paint={paints.nodes}
       />
     </Source>
   );
