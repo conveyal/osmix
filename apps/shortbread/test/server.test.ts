@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { test } from "node:test";
 
 import { Osm } from "@osmix/core";
+import { test } from "vitest";
 
 import {
   createShortbreadServerApp,
@@ -42,7 +42,7 @@ function createRemote(
   } as unknown as ShortbreadServerRemote;
 }
 
-void test("shortbread server app serves readiness and tiles without opening a port", async () => {
+test("shortbread server app serves readiness and tiles without opening a port", async () => {
   const dataset = createDataset();
   const runs: RecordedRunOptions[] = [];
   const app = createShortbreadServerApp({
@@ -82,7 +82,7 @@ void test("shortbread server app serves readiness and tiles without opening a po
   );
 });
 
-void test("shortbread server app turns tile failures into a useful response", async () => {
+test("shortbread server app turns tile failures into a useful response", async () => {
   const dataset = createDataset();
   const remote = {
     ...createRemote(dataset),
@@ -111,7 +111,7 @@ void test("shortbread server app turns tile failures into a useful response", as
   });
 });
 
-void test(
+test(
   "shortbread remote shares one indexed dataset across Node worker threads",
   { timeout: 120_000 },
   async () => {

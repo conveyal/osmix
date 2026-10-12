@@ -95,8 +95,6 @@ Colors are RGBA tuples `[r, g, b, a]` (0-255). Defaults are provided.
 ## Development
 
 - `pnpm run test packages/raster`
-- `pnpm run lint packages/raster`
-- `pnpm run typecheck packages/raster`
+- `pnpm exec oxlint packages/raster`
 
-Run `pnpm run check` at the repo root before publishing to ensure formatting,
-lint, and type coverage.
+Run `pnpm run verify` at the repo root before publishing.

@@ -130,27 +130,21 @@ pnpm run dev
 # Build all packages
 pnpm run build
 
-# Run tests
-pnpm run test
-
-# Type check
-pnpm run typecheck
-
-# Type check complete public documentation examples
-pnpm run check:docs
-
-# Format and lint
+# Format, lint and type check without changing files (oxlint runs the type checker)
 pnpm run check
 
-# Non-mutating format and lint checks
-pnpm run format:check
-pnpm run lint:check
+# Apply formatting and safe lint fixes
+pnpm run fix
 
-# Verify one workspace and its runtime dependents
-pnpm run verify:workspace -- @osmix/core
+# Run every test project: packages, apps, servers, scripts and documentation examples
+pnpm run test
 
-# Verify all non-benchmark workspaces plus dependency and Node smoke checks
-pnpm run verify:all
+# Run tests for one package, or only tests affected by changes since main
+pnpm exec vitest run --project @osmix/core
+pnpm exec vitest run --changed origin/main
+
+# Check, knip and test: run before committing
+pnpm run verify
 ```
 
 **Workspace commands** support filtering: `pnpm --filter @osmix/app dev`
@@ -159,9 +153,7 @@ Development servers use [Portless](https://github.com/vercel-labs/portless) and 
 
 Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/app dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
-`verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
-
-Complete TypeScript examples are marked `check-docs` and compiled by `check:docs`; partial configuration and application-wiring fragments are labeled `schematic`.
+Complete TypeScript examples are marked `check-docs` and compiled by a test in `scripts/check-docs.test.ts`; partial configuration and application-wiring fragments are labeled `schematic`.
 
 Routing regressions use checked-in Monaco and small generated fixtures. Reports distinguish declared route assertions from policy diagnostics and node-ID lookup from coordinate snapping. The [optional local R5 comparison](packages/osmix/test/r5/README.md) records its own endpoint-resolution and assertion evidence; R5 and large local datasets are not required by the normal test suite or CI.
 

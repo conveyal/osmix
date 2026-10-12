@@ -61,8 +61,6 @@ All modules are tree-shakeable; only import what you need.
 ## Development
 
 - `pnpm run test packages/shared`
-- `pnpm run lint packages/shared`
-- `pnpm run typecheck packages/shared`
+- `pnpm exec oxlint packages/shared`
 
-Run `pnpm run check` at the repo root before publishing to ensure formatting,
-lint, and type coverage.
+Run `pnpm run verify` at the repo root before publishing.

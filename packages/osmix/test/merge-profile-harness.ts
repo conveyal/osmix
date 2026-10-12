@@ -31,7 +31,7 @@ export interface MergeProfileStage {
   operations: MergeProfileOperationCounts;
 }
 
-export interface MergeProfileFingerprints {
+interface MergeProfileFingerprints {
   /** The built-in storage-level fingerprint, including typed-buffer ordering. */
   contentHash: string;
   /** A semantic fingerprint with sorted entities and object keys but ordered refs/members. */

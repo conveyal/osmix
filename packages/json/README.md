@@ -121,8 +121,7 @@ const pbfStream = entityStream
 
 ```sh
 pnpm run test packages/json
-pnpm run lint packages/json
-pnpm run typecheck packages/json
+pnpm exec oxlint packages/json
 ```
 
-Run `pnpm run check` at the repo root before publishing.
+Run `pnpm run verify` at the repo root before publishing.

@@ -6,7 +6,7 @@ The design rules are kept in three places, in this order of strength:
 
 1. **The theme is closed.** `packages/ui/src/styles.css` resets Tailwind's default palette, shadows, font sizes and font families. Only the tokens below produce CSS.
 2. **Primitives own styling.** Colour, type, radius, elevation and focus are set inside the components in `packages/ui` (and the map components in `packages/app-components`). Call sites compose them and add layout.
-3. **Lint enforces the rest.** `pnpm run lint:check` runs the rules in the [enforcement map](#enforcement-map). A rule marked "advisory" depends on review.
+3. **Lint enforces the rest.** `pnpm run check` runs the rules in the [enforcement map](#enforcement-map). A rule marked "advisory" depends on review.
 
 ## Theme: cartographic instrument
 
@@ -222,7 +222,7 @@ Tailwind v4 skips `node_modules`, so each package stylesheet declares `@source "
 
 ## Enforcement map
 
-The lint rules are set in `.oxlintrc.json`. `oxlint-tailwindcss` loads the design system from `packages/ui/src/styles.css`. `@shadcn/lint` checks the classes each `@osmix/ui` component receives (`settings.shadcn.ui`). The local rules live in `scripts/lint/osmix-design.ts`, with tests in `scripts/lint/osmix-design.test.ts` (`pnpm run test:design-lint`). Scope names the files each rule applies to: "all UI" is `apps/app/src`, `packages/app-components/src` and `packages/ui/src`; "apps" is `apps/app/src` and `packages/app-components/src`. The benchmark harness (`apps/bench`) is not a product UI and is out of scope.
+The lint rules are set in `.oxlintrc.json`. `oxlint-tailwindcss` loads the design system from `packages/ui/src/styles.css`. `@shadcn/lint` checks the classes each `@osmix/ui` component receives (`settings.shadcn.ui`). The local rules live in `scripts/lint/osmix-design.ts`, with tests in `scripts/lint/osmix-design.test.ts` (run by `pnpm run test`). Scope names the files each rule applies to: "all UI" is `apps/app/src`, `packages/app-components/src` and `packages/ui/src`; "apps" is `apps/app/src` and `packages/app-components/src`. The benchmark harness (`apps/bench`) is not a product UI and is out of scope.
 
 | Rule                                                                                                                                                               | Enforced by                                                                        | Scope           |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | --------------- |

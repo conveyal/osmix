@@ -82,29 +82,3 @@ shared_shape,40.7614,-73.9776,3`),
 
   return zipSync(files);
 }
-
-/**
- * Create a minimal GTFS zip with just stops (no routes or shapes).
- */
-export async function createMinimalGtfsZip(): Promise<Uint8Array> {
-  const encoder = new TextEncoder();
-
-  const files: Record<string, Uint8Array> = {
-    "agency.txt": encoder.encode(`agency_id,agency_name,agency_url,agency_timezone
-agency1,Minimal Transit,https://example.com,America/New_York`),
-
-    "stops.txt": encoder.encode(`stop_id,stop_name,stop_lat,stop_lon
-stop1,Test Stop,40.7128,-74.0060`),
-
-    "routes.txt": encoder.encode(`route_id,route_short_name,route_long_name,route_type
-route1,M,Metro Line,1`),
-
-    "trips.txt": encoder.encode(`trip_id,route_id,service_id
-trip1,route1,daily`),
-
-    "stop_times.txt": encoder.encode(`trip_id,stop_id,stop_sequence
-trip1,stop1,1`),
-  };
-
-  return zipSync(files);
-}

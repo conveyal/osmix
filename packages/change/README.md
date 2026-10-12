@@ -146,7 +146,6 @@ Options:
 ## Development
 
 - `pnpm run test packages/change`
-- `pnpm run lint packages/change`
-- `pnpm run typecheck packages/change`
+- `pnpm exec oxlint packages/change`
 
-Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run verify` at the repo root before publishing.

@@ -13,10 +13,6 @@
     "./components/*": "./src/components/*.tsx",
     "./*": "./src/*.ts"
   },
-  "scripts": {
-    "test": "pnpm -w exec vitest run --project \"$npm_package_name\" --passWithNoTests",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
     "@osmix/app-core": "workspace:*",
     "@osmix/ui": "workspace:*",

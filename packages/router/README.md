@@ -229,7 +229,6 @@ See [docs/limits.md](../../docs/limits.md#router-limits) for measured graph size
 ## Development
 
 - `pnpm run test packages/router`
-- `pnpm run lint packages/router`
-- `pnpm run typecheck packages/router`
+- `pnpm exec oxlint packages/router`
 
-Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run verify` at the repo root before publishing.

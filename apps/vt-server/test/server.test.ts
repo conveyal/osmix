@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
 
 import { Osm } from "@osmix/core";
+import { test } from "vitest";
 
 import { createVtServerApp, type VtServerDataset, type VtServerState } from "../app.ts";
 
@@ -15,7 +15,7 @@ function createDataset(): VtServerDataset {
   } as VtServerDataset;
 }
 
-void test("vt-server app serves readiness and tiles without opening a port", async () => {
+test("vt-server app serves readiness and tiles without opening a port", async () => {
   const state: VtServerState = { dataset: createDataset(), filename: "fixture.pbf", log: [] };
   const app = createVtServerApp({ state, indexHtml: "<html>fixture</html>" });
 
@@ -29,7 +29,7 @@ void test("vt-server app serves readiness and tiles without opening a port", asy
   assert.equal((await tile.arrayBuffer()).byteLength, 2);
 });
 
-void test("vt-server app turns tile failures into a useful response", async () => {
+test("vt-server app turns tile failures into a useful response", async () => {
   const dataset = createDataset();
   dataset.getVectorTile = async () => {
     throw Error("fixture tile failure");

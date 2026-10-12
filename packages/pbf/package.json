@@ -16,9 +16,7 @@
   },
   "scripts": {
     "bench": "vitest bench",
-    "build": "tsc -p tsconfig.build.json",
-    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "pbf": "catalog:"

@@ -217,11 +217,10 @@ core-storage limit from an optional spatial-index failure.
 
 ```sh
 pnpm run test packages/core
-pnpm run typecheck packages/core
-pnpm run lint packages/core
+pnpm exec oxlint packages/core
 ```
 
-Run `pnpm run check` at the repo root before publishing.
+Run `pnpm run verify` at the repo root before publishing.
 
 ## Test helpers
 

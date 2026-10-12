@@ -23,9 +23,7 @@
     "run:executable": "bun scripts/run-executable.ts",
     "start": "bun src/cli.ts",
     "stress:regional": "bun test/regional-stress.ts",
-    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-    "test:executable": "bun scripts/test-executable.ts",
-    "typecheck": "tsc --noEmit"
+    "test:executable": "bun scripts/test-executable.ts"
   },
   "dependencies": {
     "@opentui/core": "^0.5.11",

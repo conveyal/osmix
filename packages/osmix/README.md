@@ -517,8 +517,6 @@ spec-compliant without staging everything in memory.
 ## Development
 
 - `pnpm run test packages/osmix`
-- `pnpm run lint packages/osmix`
-- `pnpm run typecheck packages/osmix`
+- `pnpm exec oxlint packages/osmix`
 
-Run `pnpm run check` from the repo root before publishing to keep formatting,
-lint, and types consistent.
+Run `pnpm run verify` at the repo root before publishing.
