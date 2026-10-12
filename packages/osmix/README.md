@@ -231,6 +231,7 @@ This Vite-specific import is schematic because the `?worker&url` module is creat
 
 ```ts schematic
 import { createRemote } from "osmix";
+
 import workerUrl from "./osm.worker.ts?worker&url";
 
 const remote = await createRemote({
@@ -260,6 +261,7 @@ The matching Vite client wiring is also schematic:
 
 ```ts schematic
 import { createRemote } from "osmix";
+
 import type { MyWorker } from "./my.worker.ts";
 import workerUrl from "./my.worker.ts?worker&url";
 
@@ -301,6 +303,7 @@ Applications with custom worker protocols can use the supported
 
 ```ts schematic
 import { createOsmixWorkerPool } from "osmix/worker-pool";
+
 import type { MyWorker } from "./my.worker.ts";
 
 const pool = await createOsmixWorkerPool<MyWorker>({

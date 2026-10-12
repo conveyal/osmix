@@ -20,7 +20,7 @@ export function addOsmixPlanProtocol(remote: OsmixAppRemote) {
   if (registered) return;
   addProtocol(
     PLAN_PROTOCOL_NAME,
-    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer | null>> => {
+    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer>> => {
       const match = PLAN_URL_PATTERN.exec(req.url);
       if (!match) throw new Error(`Bad @osmix/plan URL: ${req.url}`);
       const [, baseOsmId, zStr, xStr, yStr] = match;
@@ -30,8 +30,9 @@ export function addOsmixPlanProtocol(remote: OsmixAppRemote) {
         tile,
         abortController.signal,
       );
+      abortController.signal.throwIfAborted();
       return {
-        data: abortController.signal.aborted ? null : data,
+        data,
         cacheControl: "no-cache",
       };
     },

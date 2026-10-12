@@ -16,7 +16,7 @@ export function addOsmixVectorProtocol(remote: OsmixAppRemote) {
   if (registered) return;
   addProtocol(
     VECTOR_PROTOCOL_NAME,
-    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer | null>> => {
+    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer>> => {
       const match = VECTOR_URL_PATTERN.exec(req.url);
       if (!match) throw new Error(`Bad @osmix/vector URL: ${req.url}`);
       const [, osmId, zStr, xStr, yStr] = match;
@@ -28,8 +28,9 @@ export function addOsmixVectorProtocol(remote: OsmixAppRemote) {
         signal: abortController.signal,
       });
 
+      abortController.signal.throwIfAborted();
       return {
-        data: abortController.signal.aborted ? null : data,
+        data,
         cacheControl: "no-cache",
       };
     },

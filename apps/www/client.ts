@@ -38,7 +38,8 @@ maplibregl.addProtocol("@osmix/vector", async (params, abort) => {
     /^@osmix\/vector:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.mvt$/.exec(params.url) || [];
   if (!id) throw new Error(`Bad URL: ${params.url}`);
   const data = await remote.getVectorTile(decodeURIComponent(id), [+x, +y, +z] as Tile);
-  return { data: abort.signal.aborted ? null : data };
+  abort.signal.throwIfAborted();
+  return { data };
 });
 
 async function init() {
