@@ -1,6 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@osmix/shared/tsconfig/app.json",
-  "include": ["server.ts"],
+  "compilerOptions": {
+    "types": ["node", "vite/client"]
+  },
+  "include": ["*.ts", "test"],
   "exclude": ["node_modules", "dist"]
 }

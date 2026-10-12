@@ -55,6 +55,7 @@ try {
     { id: "regional-shortbread-stress" },
   );
   const loadMs = performance.now() - loadStartedAt;
+  if (!dataset.bbox) throw Error(`${filePath} has no bounding box`);
   const [centerX, centerY] = centerTile(dataset.bbox);
   const tiles: Tile[] = [];
   for (let y = centerY - 2; y <= centerY + 1; y++) {

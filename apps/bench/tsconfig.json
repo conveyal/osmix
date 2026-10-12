@@ -4,5 +4,5 @@
   "compilerOptions": {
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "test", "scripts"]
+  "include": ["src", "test", "scripts", "*.ts"]
 }
