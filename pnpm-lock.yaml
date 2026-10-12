@@ -485,9 +485,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/osmix
     devDependencies:
-      '@osmix/json':
-        specifier: workspace:*
-        version: link:../../packages/json
       '@osmix/pbf':
         specifier: workspace:*
         version: link:../../packages/pbf

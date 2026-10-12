@@ -121,8 +121,7 @@ console.log(`Imported ${osm.ways.size} ways`);
 
 ```sh
 pnpm run test packages/geojson
-pnpm run lint packages/geojson
-pnpm run typecheck packages/geojson
+pnpm exec oxlint packages/geojson
 ```
 
-Run `pnpm run check` at the repo root before publishing.
+Run `pnpm run verify` at the repo root before publishing.

@@ -5,6 +5,7 @@
  * vector tiles with proper layer styling.
  */
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
+import type { Progress } from "@osmix/shared/progress";
 import type { GeoBbox2D, LonLat } from "@osmix/types";
 import * as maplibregl from "maplibre-gl";
 import { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl";
@@ -94,7 +95,7 @@ void waitForServerReady();
 async function waitForServerReady() {
   try {
     const res = await fetch("/ready");
-    const body = await res.json();
+    const body: { ready: boolean; log: Progress[] } = await res.json();
     let prevTimestamp = 0;
     $log.querySelector("pre")!.textContent = body.log
       .map((l) => {

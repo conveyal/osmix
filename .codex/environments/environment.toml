@@ -11,6 +11,6 @@ cd "$CODEX_WORKREE_PATH"
 pnpm install'''
 
 [[actions]]
-name = "TypeCheck"
+name = "Check"
 icon = "test"
-command = "pnpm typecheck"
+command = "pnpm check"

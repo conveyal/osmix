@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch server.ts",
-    "start": "node server.ts",
-    "test": "node test/server.test.ts",
-    "typecheck": "tsc --build --noEmit"
+    "start": "node server.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -19,7 +17,6 @@
     "osmix": "workspace:*"
   },
   "devDependencies": {
-    "@osmix/json": "workspace:*",
     "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*",
     "typescript": "catalog:",

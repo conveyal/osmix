@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+
+import { test } from "vitest";
 
 import {
+  checkDocumentationFiles,
   checkDocumentationSources,
   DocumentationCheckError,
   extractDocumentationExamples,
@@ -24,7 +26,7 @@ async function captureCheckError(markdown: string, tempParent?: string) {
   assert.fail("Expected documentation check to fail");
 }
 
-void test("extracts multiple marked fences and ignores explicitly schematic TypeScript", () => {
+test("extracts multiple marked fences and ignores explicitly schematic TypeScript", () => {
   const examples = extractDocumentationExamples(
     source(
       [
@@ -54,7 +56,7 @@ void test("extracts multiple marked fences and ignores explicitly schematic Type
   );
 });
 
-void test("rejects unclassified TypeScript fences with the README path and fence number", () => {
+test("rejects unclassified TypeScript fences with the README path and fence number", () => {
   assert.throws(
     () => extractDocumentationExamples(source("```ts\nconst value = 1;\n```")),
     (error) => {
@@ -65,7 +67,7 @@ void test("rejects unclassified TypeScript fences with the README path and fence
   );
 });
 
-void test("maps missing exports, wrong arguments, and missing await to their fences", async () => {
+test("maps missing exports, wrong arguments, and missing await to their fences", async () => {
   const error = await captureCheckError(
     [
       "```ts check-docs",
@@ -91,7 +93,7 @@ void test("maps missing exports, wrong arguments, and missing await to their fen
   assert.ok(error.diagnostics.every((diagnostic) => diagnostic.startsWith("fixtures/example.md:")));
 });
 
-void test("removes generated files after compiler failure", async () => {
+test("removes generated files after compiler failure", async () => {
   const tempParent = await mkdtemp(join(tmpdir(), "osmix-docs-test-"));
   try {
     await captureCheckError(
@@ -103,3 +105,12 @@ void test("removes generated files after compiler failure", async () => {
     await rm(tempParent, { recursive: true, force: true });
   }
 });
+
+test("repository documentation examples compile", async () => {
+  try {
+    assert.ok((await checkDocumentationFiles()) > 0);
+  } catch (error) {
+    if (!(error instanceof DocumentationCheckError)) throw error;
+    assert.fail(`Documentation examples failed to compile:\n${error.diagnostics.join("\n")}`);
+  }
+}, 60_000);

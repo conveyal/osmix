@@ -4,6 +4,6 @@ Merging ran as stages that each decided "should these two points become one node
 
 A merge is now one plan. The planner runs its phases (direct, identity, matching, crossings, checks) in order against an in-memory overlay of pending changes on the untouched base, so each phase reads what the earlier ones planned and nothing is built until the plan is applied, once. Every change is a proposal of one imported feature with a stable ID; decisions include or leave out proposals and replan from the earliest affected phase. One node-identity rulebook serves identical-point merges, connections and crossing snaps. Patch IDs follow the OSM convention, with negative IDs moved clear of the base. Plans are never serialized: after a worker restart they are rebuilt from their inputs, options and decisions, and refused when the inputs changed.
 
-The overlay is planner-internal. Keeping the base immutable in the worker, drawing tiles from the overlay, and streaming export instead of building (the rest of [task 004](../../tasks/004-immutable-base-overlay-merging-and-streaming-export.md)) are deferred.
+The overlay is planner-internal. Keeping the base immutable in the worker, drawing tiles from the overlay, and streaming export instead of building (the rest of [task 004](../tasks/004-immutable-base-overlay-merging-and-streaming-export.md)) are deferred.
 
 Replanning is per phase rather than per cluster of related proposals; it is equivalent to a fresh plan by construction, and a finer grain can come later if replans are slow on large inputs.

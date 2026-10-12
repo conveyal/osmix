@@ -4,10 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "dev": "vite dev",
-    "start": "vite",
-    "test": "vite build",
-    "typecheck": "tsc --build --noEmit"
+    "start": "vite"
   },
   "dependencies": {
     "@osmix/geo": "workspace:*",

@@ -6,7 +6,8 @@
     "node": true
   },
   "options": {
-    "typeAware": true
+    "typeAware": true,
+    "typeCheck": true
   },
   "rules": {
     "no-constant-condition": "off",

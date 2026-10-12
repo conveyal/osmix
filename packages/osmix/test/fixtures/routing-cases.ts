@@ -20,7 +20,7 @@ export interface RoutingPolicyLimitation {
   };
 }
 
-export interface RoutingTestExpectation {
+interface RoutingTestExpectation {
   reachable?: boolean;
   distanceMeters?: { min: number; max: number };
   timeSeconds?: { min: number; max: number };

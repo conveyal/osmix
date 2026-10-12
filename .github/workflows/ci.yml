@@ -22,7 +22,43 @@ jobs:
       - uses: pnpm/setup@v2
       - uses: oven-sh/setup-bun@v2
 
-      - uses: ./.github/actions/checks
+      - name: Format, lint and type check
+        run: pnpm exec oxfmt --check . && pnpm exec oxlint -f github
+
+      - name: Check unused files, exports and dependencies (knip)
+        run: pnpm run knip
+
+      - name: Build packages
+        run: pnpm run build
+
+      - name: Run tests
+        run: pnpm run test
+
+  e2e:
+    name: App browser tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: pnpm/setup@v2
+
+      - name: Install Chromium
+        run: pnpm --filter @osmix/app exec playwright install --with-deps chromium
+
+      - name: Run app browser tests
+        run: pnpm --filter @osmix/app test:e2e
+
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: |
+            apps/app/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   cli-executable:
     name: CLI standalone executable
@@ -58,7 +94,7 @@ jobs:
         run: echo "OSMIX_NODE_BINARY=$(command -v node)" >> "$GITHUB_ENV"
 
       - name: Run runtime smoke test
-        run: pnpm run test:node-smoke
+        run: pnpm run smoke
 
   runtime-bun:
     name: Runtime smoke (Bun)
@@ -73,4 +109,4 @@ jobs:
           runtime: bun
 
       - name: Run runtime smoke test
-        run: pnpm run test:node-smoke -- bun
+        run: pnpm run smoke -- bun

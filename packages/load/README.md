@@ -254,8 +254,7 @@ for await (const entity of stream) {
 
 ```sh
 pnpm run test packages/load
-pnpm run lint packages/load
-pnpm run typecheck packages/load
+pnpm exec oxlint packages/load
 ```
 
-Run `pnpm run check` at the repo root before publishing.
+Run `pnpm run verify` at the repo root before publishing.

@@ -17,9 +17,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "vitest bench",
-    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-    "typecheck": "tsc --noEmit"
+    "bench": "vitest bench"
   },
   "dependencies": {
     "@osmix/geo": "workspace:*",

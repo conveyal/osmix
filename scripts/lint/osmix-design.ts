@@ -4,16 +4,10 @@
  * rules each one enforces.
  */
 
-type Node = { type: string; [key: string]: unknown };
-type Context = { report: (descriptor: { node: Node; messageId: string }) => void };
-type Rule = {
-  meta: {
-    type: "problem" | "suggestion";
-    docs: { description: string };
-    messages: Record<string, string>;
-  };
-  create: (context: Context) => Record<string, (node: Node) => void>;
-};
+import type { RuleTester } from "oxlint/plugins-dev";
+
+type Rule = Exclude<Parameters<RuleTester["run"]>[1], { createOnce: unknown }>;
+type Ranged = { range: [number, number] };
 
 const HEX_COLOR = /(?:^|[\s(,:])#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b/i;
 const COLOR_FUNCTION = /^\s*(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/i;
@@ -48,20 +42,19 @@ const noRawColor: Rule = {
   create(context) {
     return {
       Literal(node) {
-        if (typeof node["value"] === "string" && isRawColor(node["value"])) {
+        if (typeof node.value === "string" && isRawColor(node.value)) {
           context.report({ node, messageId: "raw" });
         }
       },
       TemplateElement(node) {
-        const value = node["value"] as { raw: string };
-        if (HEX_COLOR.test(value.raw)) context.report({ node, messageId: "raw" });
+        if (HEX_COLOR.test(node.value.raw)) context.report({ node, messageId: "raw" });
       },
       ArrayExpression(node) {
-        const [first] = node["elements"] as (Node | null)[];
+        const [first] = node.elements;
         if (
           first?.type === "Literal" &&
-          typeof first["value"] === "string" &&
-          MAPLIBRE_COLOR_EXPRESSIONS.has(first["value"])
+          typeof first.value === "string" &&
+          MAPLIBRE_COLOR_EXPRESSIONS.has(first.value)
         ) {
           context.report({ node, messageId: "raw" });
         }
@@ -80,13 +73,11 @@ const noNativeRadio: Rule = {
   create(context) {
     return {
       JSXOpeningElement(node) {
-        const name = node["name"] as Node;
-        if (name.type !== "JSXIdentifier" || name["name"] !== "input") return;
-        for (const attribute of node["attributes"] as Node[]) {
+        if (node.name.type !== "JSXIdentifier" || node.name.name !== "input") return;
+        for (const attribute of node.attributes) {
           if (attribute.type !== "JSXAttribute") continue;
-          const attributeName = attribute["name"] as Node;
-          const value = attribute["value"] as Node | null;
-          if (attributeName["name"] === "type" && value?.["value"] === "radio") {
+          const { name, value } = attribute;
+          if (name.name === "type" && value?.type === "Literal" && value.value === "radio") {
             context.report({ node, messageId: "radio" });
           }
         }
@@ -107,17 +98,17 @@ const noIconSizeButton: Rule = {
   create(context) {
     return {
       JSXOpeningElement(node) {
-        const name = node["name"] as Node;
-        if (name.type !== "JSXIdentifier" || name["name"] !== "Button") return;
-        for (const attribute of node["attributes"] as Node[]) {
-          if (attribute.type !== "JSXAttribute") continue;
-          if ((attribute["name"] as Node)["name"] !== "size") continue;
-          let value = attribute["value"] as Node | null;
-          if (value?.type === "JSXExpressionContainer") value = value["expression"] as Node;
+        if (node.name.type !== "JSXIdentifier" || node.name.name !== "Button") return;
+        for (const attribute of node.attributes) {
+          if (attribute.type !== "JSXAttribute" || attribute.name.name !== "size") continue;
+          const value =
+            attribute.value?.type === "JSXExpressionContainer"
+              ? attribute.value.expression
+              : attribute.value;
           if (
             value?.type === "Literal" &&
-            typeof value["value"] === "string" &&
-            value["value"].startsWith("icon")
+            typeof value.value === "string" &&
+            value.value.startsWith("icon")
           ) {
             context.report({ node, messageId: "iconButton" });
           }
@@ -137,22 +128,21 @@ const noAsciiEllipsis: Rule = {
     messages: { ellipsis: 'Use "…" (U+2026) instead of "..." in UI copy.' },
   },
   create(context) {
-    const check = (node: Node, text: unknown) => {
+    const check = (node: Ranged, text: unknown) => {
       if (typeof text === "string" && ASCII_ELLIPSIS.test(text)) {
         context.report({ node, messageId: "ellipsis" });
       }
     };
     return {
       JSXText(node) {
-        check(node, node["value"]);
+        check(node, node.value);
       },
       JSXAttribute(node) {
-        const value = node["value"] as Node | null;
-        if (value?.type === "Literal") check(value, value["value"]);
+        if (node.value?.type === "Literal") check(node.value, node.value.value);
       },
       JSXExpressionContainer(node) {
-        const expression = node["expression"] as Node;
-        if (expression.type === "Literal") check(expression, expression["value"]);
+        const { expression } = node;
+        if (expression.type === "Literal") check(expression, expression.value);
       },
     };
   },
@@ -185,13 +175,14 @@ const noBreakpointVariant: Rule = {
   create(context) {
     return {
       Literal(node) {
-        if (typeof node["value"] === "string" && hasBreakpointVariant(node["value"])) {
+        if (typeof node.value === "string" && hasBreakpointVariant(node.value)) {
           context.report({ node, messageId: "breakpoint" });
         }
       },
       TemplateElement(node) {
-        const value = node["value"] as { raw: string };
-        if (hasBreakpointVariant(value.raw)) context.report({ node, messageId: "breakpoint" });
+        if (hasBreakpointVariant(node.value.raw)) {
+          context.report({ node, messageId: "breakpoint" });
+        }
       },
     };
   },

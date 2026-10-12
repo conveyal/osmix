@@ -155,7 +155,7 @@ Task 005 refers to "the read-only contracts introduced by Task 004". Those contr
 - If step 2 is done: the streamed PBF is semantically equal to `applyPlan()` output on all automated fixtures, and no `Osm` is built during the export.
 - If step 2 is done: the target large-base scenario exports with peak additional memory bounded by the plan and export buffers, not the base size.
 - `applyPlan()`, `applyChangesetToOsm()` and `merge()` behave as before.
-- All affected workspaces and dependents pass format, lint, typecheck, tests and knip, per `AGENTS.md`.
+- `pnpm run verify` passes, per `AGENTS.md`.
 
 ## Likely files
 

@@ -2,15 +2,16 @@
 
 ## Run These Every Change
 
-- For each changed package/app (and packages/apps that depend on the changed code): `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` must be green.
+- While working: `pnpm run fix` to format and apply safe lint fixes, and `pnpm exec vitest run --changed origin/main` (or `--project @osmix/<name>`) for the tests your change touches.
+- Before committing: `pnpm run verify` (check, knip and every test project) must be green.
 - Add or extend tests and documentation when behavior or public APIs change.
 - Before changing merge rules, matching actions, or merge workflow states, read [docs/merge-process.md](docs/merge-process.md). Update its affected rules/examples and linked regression tests in the same PR.
-- Only run root tests before committing.
-- `pnpm run knip` must pass: it flags unused files, exports, and dependencies, and imports missing from `package.json`. Configure false positives (non-standard entry points) in `knip.json`; do not keep dead exports.
+- `pnpm run knip` flags unused files, exports, and dependencies, and imports missing from `package.json`. Configure false positives (non-standard entry points) in `knip.json`; do not keep dead exports.
 
 ## Testing Notes
 
-- Vitest with tests as `*.test.ts`.
+- Vitest with tests as `*.test.ts`. One root `vitest.config.ts` lists every project: `packages/*`, `apps/app`, the two servers, and `scripts`. Packages have no `test` scripts; run vitest from the root. `apps/bench` runs in a browser and only through `pnpm -F @osmix/bench test`.
+- `scripts/check-docs.test.ts` compiles the `check-docs` code blocks in the READMEs and `docs/merge-process.md`.
 - Fixtures: prefer `fixtures/monaco.pbf` via `@osmix/test-utils/fixtures` (devDependency in tests).
 - Cover parsing, serialization, spatial queries, merge workflows, and regressions.
 
@@ -62,15 +63,12 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 ## Commands
 
 - `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev; `pnpm run build` for production bundles.
-- `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
-- `pnpm run format:check` and `pnpm run lint:check` run non-mutating formatting and lint checks.
+- `pnpm run check` runs `oxfmt --check` and `oxlint` without changing files. `oxlint` is type-aware and runs the TypeScript checker (`typeCheck` in `.oxlintrc.json`), so there is no separate `typecheck` script. Every `.ts` file must be in some `tsconfig.json`; the root one covers `scripts/` and root configs.
+- `pnpm run fix` runs `oxfmt` and `oxlint --fix`.
+- `pnpm run test` runs every vitest project once.
+- `pnpm run verify` runs `check`, `knip` and `test`.
 - `pnpm run knip` flags unused files, exports, and dependencies, and undeclared imports, across all workspaces.
-- `pnpm run test:verify-workspace` tests the workspace selector and required-script checks.
-- `pnpm run verify:workspace -- @osmix/core` verifies a workspace and its runtime/development dependents in dependency order.
-- `pnpm run verify:workspace -- apps/vt-server` accepts an app path selector and verifies that app's runtime graph.
-- `pnpm run verify:all` verifies every non-benchmark workspace, then runs knip and Node smoke checks.
-
-`verify:workspace` is check-only by default. Pass `--write` when an explicit formatting write is intended. The benchmark app is excluded from the all-workspace contract because its browser benchmark is not a package test; select it explicitly when working on that app.
+- `pnpm run smoke` packs the published packages and imports them from a clean consumer (CI runs it on Node and Bun).
 
 ## Gotchas
 

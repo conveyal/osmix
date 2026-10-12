@@ -1,7 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   API as TypeScriptApi,
@@ -9,7 +8,7 @@ import {
   type Diagnostic as TypeScriptDiagnostic,
 } from "typescript/unstable/sync";
 
-export const DOCUMENT_PATHS = [
+const DOCUMENT_PATHS = [
   "README.md",
   "docs/merge-process.md",
   "packages/change/README.md",
@@ -308,25 +307,4 @@ export async function checkDocumentationFiles(
     }),
   );
   return checkDocumentationSources(sources, options);
-}
-
-async function main(): Promise<void> {
-  const requestedPaths = process.argv.slice(2);
-  try {
-    const exampleCount = await checkDocumentationFiles(
-      requestedPaths.length > 0 ? requestedPaths : DOCUMENT_PATHS,
-    );
-    console.log(`Documentation examples passed (${exampleCount} checked)`);
-  } catch (error) {
-    if (error instanceof DocumentationCheckError) {
-      for (const diagnostic of error.diagnostics) console.error(diagnostic);
-    } else {
-      console.error(error instanceof Error ? error.message : String(error));
-    }
-    process.exitCode = 1;
-  }
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main();
 }

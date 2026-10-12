@@ -1,6 +1,5 @@
-import { describe, it } from "node:test";
-
 import { RuleTester } from "oxlint/plugins-dev";
+import { describe, it } from "vitest";
 
 import { rules } from "./osmix-design.ts";
 

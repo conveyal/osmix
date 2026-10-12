@@ -45,7 +45,7 @@ const NEGATIVE_ACCESS_VALUES = new Set(["no", "private"]);
  * Test-only subset of R5's motor-vehicle access policy. This deliberately does not model
  * conditional access, barriers, or every OSM vehicle class and is not a public routing profile.
  */
-export const routingTestCarAccessFilter: HighwayFilter = (tags?: OsmTags): boolean => {
+const routingTestCarAccessFilter: HighwayFilter = (tags?: OsmTags): boolean => {
   if (!defaultHighwayFilter(tags)) return false;
   const access =
     tags?.["motorcar"] ?? tags?.["motor_vehicle"] ?? tags?.["vehicle"] ?? tags?.["access"];
@@ -53,7 +53,7 @@ export const routingTestCarAccessFilter: HighwayFilter = (tags?: OsmTags): boole
 };
 
 /** Test-only pedestrian policy; this does not establish complete production access semantics. */
-export const routingTestWalkFilter: HighwayFilter = (tags?: OsmTags): boolean => {
+const routingTestWalkFilter: HighwayFilter = (tags?: OsmTags): boolean => {
   const highway = tags?.["highway"];
   if (!highway || !WALKABLE_HIGHWAYS.has(String(highway))) return false;
   if (tags["foot"] === "no" || tags["foot"] === "private") return false;
@@ -66,20 +66,20 @@ export const routingTestWalkFilter: HighwayFilter = (tags?: OsmTags): boolean =>
   return true;
 };
 
-export interface RoutingGraphReport {
+interface RoutingGraphReport {
   nodes: number;
   edges: number;
   weakComponents: number;
 }
 
-export interface RoutingEndpointReport {
+interface RoutingEndpointReport {
   nodeId: number;
   coordinates: LonLat;
   snapDistanceMeters: number;
   resolution: "osm-node-id" | "nearest-routable-node";
 }
 
-export interface RoutingPathReport {
+interface RoutingPathReport {
   nodeIds: number[];
   wayIds: number[];
   highways: string[];
@@ -514,7 +514,7 @@ export function stableRoutingReport(report: RoutingCaseReport) {
   };
 }
 
-export function routingReportsToGeoJson(
+function routingReportsToGeoJson(
   reports: readonly RoutingCaseReport[],
 ): FeatureCollection<LineString> {
   return {
