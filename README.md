@@ -13,7 +13,7 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 - Streaming PBF parsing with minimal memory overhead
 - Spatial queries via R-tree indexes (KDBush, Flatbush)
 - Merge and deduplicate OSM extracts
-- Cross-platform – ESM-native, runs in Node.js, Bun, Deno, and browsers
+- Cross-platform – ESM-native, runs in Node.js, Bun, and browsers
 - Generate raster and vector tiles
 - Worker-based processing for responsive UIs
 

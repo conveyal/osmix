@@ -70,7 +70,7 @@ Target repos (org `osmix-dev`):
 
 ## Verification
 
-- Core after each phase: `pnpm run verify:all` (includes `knip`), CI green on `ci.yml` (Node/Bun/Deno runtime smoke).
+- Core after each phase: `pnpm run verify:all` (includes `knip`), CI green on `ci.yml` (Node/Bun runtime smoke).
 - Each new repo: fresh `pnpm install` resolves only published `@osmix/*` versions (no `workspace:`), then format/lint/typecheck/test green.
 - `tiles`: both servers boot and serve a tile from `monaco.pbf`.
 - `cli`: `test:executable` passes under Bun; a dry-run release builds executables.

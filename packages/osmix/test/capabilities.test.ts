@@ -99,14 +99,6 @@ describe("capabilities", () => {
       expect(getOsmixCapabilities().workerRuntime).toBe("bun");
       expect(getOsmixCapabilities().recommendedMode).not.toBe("in-process");
     });
-
-    it("detects Deno before optional Node compatibility globals", () => {
-      vi.stubGlobal("Deno", { version: { deno: "2.7.0" } });
-      vi.stubGlobal("Worker", class {});
-      expect(getWorkerRuntime()).toBe("deno");
-      expect(getOsmixCapabilities().workerRuntime).toBe("deno");
-      expect(getOsmixCapabilities().recommendedMode).not.toBe("in-process");
-    });
   });
 
   describe("selectWorkerCount", () => {

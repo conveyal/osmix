@@ -236,7 +236,7 @@ export interface OsmixRemoteOptions {
    * })
    */
   workerUrl?: URL;
-  /** Override automatic browser/Bun/Deno Web Worker or Node worker-thread selection. */
+  /** Override automatic browser/Bun Web Worker or Node worker-thread selection. */
   workerRuntime?: WorkerRuntime | "auto";
   /**
    * Run the `OsmixWorker` on the calling thread instead of spawning a
@@ -328,7 +328,7 @@ export class OsmixCommittedMutationError extends Error {
  * Each worker receives the same progress listener proxy if provided.
  *
  * Mode selection (see `getOsmixCapabilities()` and `remote.mode`):
- * - Cross-origin isolated browsers, Bun, Deno, and Node get shared multi-worker datasets
+ * - Cross-origin isolated browsers, Bun, and Node get shared multi-worker datasets
  *   via `SharedArrayBuffer`.
  * - Browsers without `SharedArrayBuffer` sharing get a single worker.
  * - Environments without a worker implementation throw; pass `inProcess: true` to run on
@@ -405,7 +405,7 @@ export class OsmixPlanRecoveryError extends Error {
 
 /**
  * Create a single `OsmixWorker` instance wrapped with Comlink.
- * Spawns a browser, Bun, or Deno Worker or a Node worker thread and returns a proxy.
+ * Spawns a browser or Bun Worker or a Node worker thread and returns a proxy.
  *
  * @param workerUrl - Optional URL to a custom worker file. If not provided,
  *                    uses the default `OsmixWorker`.

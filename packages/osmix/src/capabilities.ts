@@ -13,13 +13,13 @@ import { supportsReadableStreamTransfer } from "./utils.ts";
 /**
  * How an `OsmixRemote` runs its workload.
  * - `multi-worker`: worker pool sharing datasets via `SharedArrayBuffer`.
- * - `single-worker`: one browser, Bun, Deno, or Node worker.
+ * - `single-worker`: one browser, Bun, or Node worker.
  * - `in-process`: no worker; everything runs on the calling thread.
  */
 export type OsmixMode = "multi-worker" | "single-worker" | "in-process";
 
 /** Worker implementation available in the current runtime. */
-export type WorkerRuntime = "web" | "bun" | "deno" | "node" | "none";
+export type WorkerRuntime = "web" | "bun" | "node" | "none";
 
 /** Options for selecting a bounded worker count while reserving caller capacity. */
 export interface SelectWorkerCountOptions {
@@ -57,9 +57,6 @@ export interface OsmixCapabilities {
 export function getWorkerRuntime(): WorkerRuntime {
   const bun = Reflect.get(globalThis, "Bun") as { version?: unknown } | undefined;
   if (typeof bun?.version === "string") return "bun";
-
-  const deno = Reflect.get(globalThis, "Deno") as { version?: { deno?: unknown } } | undefined;
-  if (typeof deno?.version?.deno === "string") return "deno";
 
   if (
     typeof process !== "undefined" &&

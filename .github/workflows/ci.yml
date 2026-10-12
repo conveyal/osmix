@@ -74,18 +74,3 @@ jobs:
 
       - name: Run runtime smoke test
         run: pnpm run test:node-smoke -- bun
-
-  runtime-deno:
-    name: Runtime smoke (Deno)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - uses: pnpm/setup@v2
-        with:
-          runtime: deno
-
-      - name: Run runtime smoke test
-        run: pnpm run test:node-smoke -- deno
