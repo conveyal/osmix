@@ -1,5 +1,35 @@
 # @osmix/load
 
+## 0.1.0
+
+### Minor Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- e4785fe: Expose structured typed-buffer and entity-finalization failures across workers, identify safe View-profile
+  retries for spatial capacity errors, and show persistent actionable dataset-load diagnostics in Merge.
+- 66eb7cd: **Breaking:** make node tag filters safe for routing. Node rules now select only standalone nodes: a tag-filtered load keeps every node that a kept way or relation references, and `pruneUnreferencedNodes` drops the rest after ingestion. `CONVEYAL_EXTRACT_TAG_FILTERS` now keeps only `park_ride` standalone nodes, which makes R5 extracts much smaller. Extracts never remove members from a turn restriction: `simple` and `complete_ways` drop a restriction the bbox cuts, and `smart` completes it. Adds `isRestrictionRelation`.
+- 66eb7cd: **Breaking:** remove the deprecated `buildSpatialIndexes` load option. Choose spatial indexes with `loadProfile` (`"auto"`, `"full"`, or `"view"`) or, for an exact selection, `spatialIndexes`. For example, `buildSpatialIndexes: ["way", "relation"]` becomes `spatialIndexes: { nodes: [], ways: true, relations: true }`.
+
+### Patch Changes
+
+- 66eb7cd: PBF exports record `osmosis_replication_timestamp` in seconds since the epoch, as the PBF format defines it, instead of milliseconds. Files exported by earlier versions carry a millisecond value.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [466adc0]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/types@0.2.0
+  - @osmix/json@0.0.17
+  - @osmix/pbf@0.0.10
+
 ## 0.0.2
 
 ### Patch Changes

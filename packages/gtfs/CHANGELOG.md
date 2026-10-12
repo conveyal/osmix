@@ -1,5 +1,24 @@
 # @osmix/gtfs
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [5c624d5]
+- Updated dependencies [e4785fe]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [e938749]
+- Updated dependencies [466adc0]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/raster@0.1.0
+  - @osmix/types@0.2.0
+
 ## 0.0.11
 
 ### Patch Changes

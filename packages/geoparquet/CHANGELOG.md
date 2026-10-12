@@ -1,5 +1,21 @@
 # @osmix/geoparquet
 
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [466adc0]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/types@0.2.0
+
 ## 0.1.10
 
 ### Patch Changes
