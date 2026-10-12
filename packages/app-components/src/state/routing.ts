@@ -1,3 +1,4 @@
+import { mapModeAtom, selectOsmEntityAtom } from "@osmix/app-core";
 import type { Feature, FeatureCollection } from "geojson";
 import { atom } from "jotai";
 import type { RouteResult, WaySegment } from "osmix";
@@ -26,18 +27,43 @@ export interface RoutingState {
   toNode: SnappedNode | null;
   /** Route result with coordinates and optional stats/path info. */
   result: RouteResult | null;
+  /** The dataset the points were snapped on; `null` until the first point snaps. */
+  osmId: string | null;
 }
 
-const initialState: RoutingState = {
+/** The empty routing state: no points, no snapped nodes, no result. */
+export const initialRoutingState: RoutingState = {
   fromPoint: null,
   toPoint: null,
   fromNode: null,
   toNode: null,
   result: null,
+  osmId: null,
 };
 
 /** Main routing state atom. */
-export const routingStateAtom = atom<RoutingState>(initialState);
+export const routingStateAtom = atom<RoutingState>(initialRoutingState);
+
+/**
+ * Whether a route computed from `fromNode` may still be written into `state`: the start point
+ * must be the same snapped node and no destination may have arrived since. "Clear route" or a
+ * new start point during the computation makes the result stale.
+ */
+export function routeResultStillApplies(state: RoutingState, fromNode: SnappedNode): boolean {
+  return state.fromNode === fromNode && state.toNode === null;
+}
+
+/** Enter the routing tool: clear the selected entity, then switch map clicks to routing. */
+export const enterRoutingModeAtom = atom(null, (_get, set) => {
+  set(selectOsmEntityAtom, null, null);
+  set(mapModeAtom, "route");
+});
+
+/** Leave the routing tool: map clicks select again and the route is cleared. */
+export const exitRoutingModeAtom = atom(null, (_get, set) => {
+  set(mapModeAtom, "select");
+  set(routingStateAtom, initialRoutingState);
+});
 
 /** Derived atom that builds GeoJSON from routing state. */
 export const routingGeoJsonAtom = atom<FeatureCollection>((get) => {

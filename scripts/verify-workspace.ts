@@ -179,7 +179,7 @@ async function main() {
     run("pnpm", ["run", "test:check-docs"], rootDir);
     run("pnpm", ["run", "check:docs"], rootDir);
     await verifySelected(topologicalOrder(selected), { write, style: false });
-    run("pnpm", ["run", "check:deps"], rootDir);
+    run("pnpm", ["run", "knip"], rootDir);
     run("pnpm", ["run", "test:node-smoke"], rootDir);
     return;
   }

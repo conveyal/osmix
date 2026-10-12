@@ -1,5 +1,6 @@
 import { type BrowserLoadCapabilities, getBrowserLoadCapabilities } from "@osmix/app-core";
 import {
+  Alert,
   bytesSizeToHuman,
   StatusDot,
   Button,
@@ -12,6 +13,9 @@ import {
   Spinner,
 } from "@osmix/ui";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+
+import { LIMITS_PATH } from "../lib/app-pages.ts";
 
 type SystemIssue = {
   id: "secure-context" | "cross-origin-isolated" | "device-memory";
@@ -66,20 +70,17 @@ function useSystemIssues() {
 
 export default function BrowserCheck() {
   const { issues } = useSystemIssues();
+  const [open, setOpen] = useState(false);
   const hoverText =
     issues.length === 0
       ? "No system issues detected"
       : issues.map((i) => `• ${i.title}: ${i.detail}`).join("\n");
 
   return (
-    <Dialog>
-      <DialogTrigger render={<Button size="sm" variant="link" />}>
-        <span className="inline-flex items-center gap-2">
-          Check system
-          {issues.length > 0 ? (
-            <StatusDot className="inline-block" status="error" title={hoverText} />
-          ) : null}
-        </span>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" variant="ghost" />}>
+        Check system
+        {issues.length > 0 ? <StatusDot status="error" title={hoverText} /> : null}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -92,21 +93,27 @@ export default function BrowserCheck() {
         </DialogHeader>
         <div className="flex flex-col gap-2">
           {issues.length > 0 ? (
-            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-destructive">
-              <div className="font-bold">Potential issues</div>
-              <ul className="mt-1 list-disc pl-5">
+            <Alert variant="destructive" title="Potential issues">
+              <ul className="list-disc pl-4">
                 {issues.map((issue) => (
                   <li key={issue.id}>
                     <span className="font-medium">{issue.title}:</span> {issue.detail}
                   </li>
                 ))}
               </ul>
-            </div>
+            </Alert>
           ) : null}
           <SecureContext />
           <DeviceMemory />
           <StorageEstimate />
           <MaxArraySizes />
+          <p className="text-muted-foreground">
+            The file sizes that load with each feature are on the{" "}
+            <Link href={LIMITS_PATH} className="text-info underline" onClick={() => setOpen(false)}>
+              Limits page
+            </Link>
+            .
+          </p>
         </div>
       </DialogContent>
     </Dialog>
@@ -120,11 +127,11 @@ function SecureContext() {
 
   return (
     <div>
-      <div className="font-bold">Secure context</div>
+      <div className="font-semibold">Secure context</div>
       <div>{secure ? "yes" : "no"}</div>
-      <div className="font-bold">Cross origin isolated</div>
+      <div className="font-semibold">Cross origin isolated</div>
       <div>{crossOriginIsolated ? "yes" : "no"}</div>
-      <div className="font-bold">Hardware concurrency</div>
+      <div className="font-semibold">Hardware concurrency</div>
       <div>{hardwareConcurrency}</div>
     </div>
   );
@@ -135,7 +142,7 @@ function DeviceMemory() {
 
   return (
     <div>
-      <div className="font-bold">Reported device memory class</div>
+      <div className="font-semibold">Reported device memory class</div>
       <div>{memory}</div>
     </div>
   );
@@ -158,7 +165,7 @@ function StorageEstimate() {
 
   return (
     <div>
-      <div className="font-bold">Storage</div>
+      <div className="font-semibold">Storage</div>
       <div>Usage: {(storage.usage / 1024 / 1024).toFixed(2)} MB</div>
       <div>Quota: {(storage.quota / 1024 / 1024).toFixed(2)} MB</div>
       <div>
@@ -205,7 +212,7 @@ function MaxArraySizes() {
 
   return (
     <div>
-      <div className="font-bold">Tested buffer ceilings</div>
+      <div className="font-semibold">Tested buffer ceilings</div>
       {capabilities ? (
         <>
           <div>ArrayBuffer: {bytesSizeToHuman(capabilities.arrayBufferMaxBytes)}</div>
@@ -221,7 +228,7 @@ function MaxArraySizes() {
               ? "SharedArrayBuffer"
               : "ArrayBuffer"}
           </div>
-          <div className="font-bold">Derived active-buffer element counts</div>
+          <div className="font-semibold">Derived active-buffer element counts</div>
           {TypedArrays.map((arrayType) => (
             <div key={arrayType.name}>
               {arrayType.name}:{" "}

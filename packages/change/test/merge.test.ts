@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset";
 import { OsmChangeset } from "../src/changeset";
-import { generateChangeset } from "../src/generate-changeset";
+import { stagedChanges } from "./helpers/changes.ts";
 
 const sizes = (osm: Osm) => ({
   nodes: osm.nodes.size,
@@ -37,11 +37,15 @@ describe("merge osm", () => {
       nodeChanges: 6,
       wayChanges: 4,
       relationChanges: 0,
+      createChanges: 9,
+      modifyChanges: 1,
+      deleteChanges: 0,
       deduplicatedNodes: 0,
       deduplicatedNodesReplaced: 0,
       deduplicatedWays: 0,
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
     });
 
     const directResult = applyChangesetToOsm(changeset);
@@ -61,7 +65,7 @@ describe("merge osm", () => {
       },
     });
 
-    changeset = generateChangeset(base, patch, {
+    changeset = stagedChanges(base, patch, {
       directMerge: true,
       deduplicateNodes: true,
       deduplicateWays: true,
@@ -99,11 +103,15 @@ describe("merge osm", () => {
       nodeChanges: 1,
       wayChanges: 2,
       relationChanges: 0,
+      createChanges: 1,
+      modifyChanges: 2,
+      deleteChanges: 0,
       deduplicatedNodes: 0,
       deduplicatedNodesReplaced: 0,
       deduplicatedWays: 0,
       intersectionPointsFound: 1,
       intersectionNodesCreated: 1,
+      intersectionNodesRemoved: 0,
     });
 
     const intersectionResult = applyChangesetToOsm(changeset);

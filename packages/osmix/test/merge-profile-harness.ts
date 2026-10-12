@@ -1,23 +1,17 @@
 import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 
-import {
-  discoverConflationCandidatesForTrustedMerge,
-  generateConflationApplicationArtifactsFromTrustedDiscovery,
-} from "@osmix/change/internal/conflation";
 import type { Osm } from "@osmix/core";
 import type { OsmEntity } from "@osmix/types";
 
 import {
-  applyChangesetToOsm,
+  applyPlan,
   createOsmJsonReadableStream,
+  type MergePlanOptions,
   OsmBlocksToPbfBytesTransformStream,
   OsmJsonToBlocksTransformStream,
-  OsmChangeset,
-  OsmixWorker,
-  type OsmConflationGenerationResult,
+  planMerge,
   type OsmConflationSummary,
-  type OsmMergeOptions,
   type OsmChangesetStats,
 } from "../src/index.ts";
 
@@ -85,16 +79,6 @@ interface MemorySnapshot {
   peakRss: number;
 }
 
-class ProfileOsmixWorker extends OsmixWorker {
-  register(osm: Osm): void {
-    this.set(osm.id, osm);
-  }
-
-  read(osmId: string): Osm {
-    return this.get(osmId);
-  }
-}
-
 function roundMilliseconds(value: number): number {
   return Math.round(value * 1_000) / 1_000;
 }
@@ -117,6 +101,24 @@ class MergeProfileRecorder {
     const cpuBefore = process.cpuUsage();
     const started = performance.now();
     const result = await task();
+    return this.record(name, result, memoryBefore, cpuBefore, started);
+  }
+
+  /** `measure` for work that must finish synchronously, such as a planner phase. */
+  measureSync<T>(name: string, task: () => StageResult<T>): T {
+    const memoryBefore = memorySnapshot();
+    const cpuBefore = process.cpuUsage();
+    const started = performance.now();
+    return this.record(name, task(), memoryBefore, cpuBefore, started);
+  }
+
+  private record<T>(
+    name: string,
+    result: StageResult<T>,
+    memoryBefore: MemorySnapshot,
+    cpuBefore: NodeJS.CpuUsage,
+    started: number,
+  ): T {
     const durationMs = performance.now() - started;
     const cpu = process.cpuUsage(cpuBefore);
     const memoryAfter = memorySnapshot();
@@ -166,6 +168,7 @@ function changesetCounts(stats: OsmChangesetStats): MergeProfileOperationCounts 
     deduplicatedWays: stats.deduplicatedWays,
     intersectionPointsFound: stats.intersectionPointsFound,
     intersectionNodesCreated: stats.intersectionNodesCreated,
+    intersectionNodesRemoved: stats.intersectionNodesRemoved,
   };
 }
 
@@ -222,7 +225,7 @@ async function pbfFingerprint(osm: Osm): Promise<{ sha256: string; bytes: number
     {
       ...osm.header,
       writingprogram: "@osmix/core",
-      osmosis_replication_timestamp: 1_700_000_000_000,
+      osmosis_replication_timestamp: 1_700_000_000,
     },
     sortedEntities(osm),
   )
@@ -268,149 +271,35 @@ async function collectFingerprints(
   };
 }
 
-function routingDiagnosticCounts(
-  diagnostics: OsmConflationGenerationResult["routing"],
-): MergeProfileOperationCounts {
-  const counts: MergeProfileOperationCounts = {};
-  for (const mode of ["car", "walk"] as const) {
-    for (const view of ["before", "after", "delta"] as const) {
-      for (const [key, value] of Object.entries(diagnostics[mode][view])) {
-        counts[
-          `${mode}${view[0]!.toUpperCase()}${view.slice(1)}${key[0]!.toUpperCase()}${key.slice(1)}`
-        ] = value;
-      }
-    }
-  }
-  return counts;
-}
-
 /**
- * Run the merge pipeline through its public changeset operations while recording
- * each expensive boundary separately. This intentionally follows the same order
- * as `merge`: ordinary direct/exact changes, optional conflation, then intersections.
+ * Plan and apply a merge as `merge` does, recording each planner phase, the final checks and
+ * the single build separately.
  */
 export async function profileMerge(
   base: Osm,
   patch: Osm,
-  options: Partial<OsmMergeOptions>,
+  options: MergePlanOptions,
   profileOptions: ProfileMergeOptions = {},
 ): Promise<MergeProfileRun> {
   const recorder = new MergeProfileRecorder();
   const wallStarted = performance.now();
-  let modifiedBase = base;
-
-  if (options.directMerge || options.deduplicateNodes || options.deduplicateWays) {
-    const changeset = await recorder.measure("prepare-direct-exact-changeset", () => ({
-      value: new OsmChangeset(base),
-      operations: prefixedCounts("base", osmEntityCounts(base)),
-    }));
-
-    if (options.directMerge) {
-      await recorder.measure("generate-direct-changes", () => {
-        changeset.generateDirectChanges(patch);
-        return { value: undefined, operations: changesetCounts(changeset.stats) };
-      });
-    }
-
-    if (options.deduplicateNodes) {
-      await recorder.measure("reconcile-exact-nodes", () => {
-        changeset.deduplicateNodes(patch.nodes);
-        return { value: undefined, operations: changesetCounts(changeset.stats) };
-      });
-    }
-
-    if (options.deduplicateWays) {
-      await recorder.measure("reconcile-exact-ways", () => {
-        let waysChecked = 0;
-        let waysReconciled = 0;
-        for (const reconciled of changeset.deduplicateWaysGenerator(patch.ways)) {
-          waysChecked++;
-          waysReconciled += reconciled;
-        }
-        return {
-          value: undefined,
-          operations: {
-            ...changesetCounts(changeset.stats),
-            waysChecked,
-            waysReconciled,
-          },
-        };
-      });
-    }
-
-    modifiedBase = await recorder.measure("apply-direct-exact-changes", () => {
-      const result = applyChangesetToOsm(changeset);
-      return {
-        value: result,
-        operations: {
-          ...changesetCounts(changeset.stats),
-          ...prefixedCounts("output", osmEntityCounts(result)),
-        },
-      };
-    });
-  }
-
-  if (options.conflation) {
-    if (!options.directMerge) {
-      throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
-    }
-    const discovery = await recorder.measure("discover-conflation-candidates", () => {
-      const result = discoverConflationCandidatesForTrustedMerge(base, patch, options.conflation!);
-      return {
-        value: result,
-        operations: prefixedCounts("candidate", result.summary),
-      };
-    });
-    const conflation = await recorder.measure("generate-conflation-changes", () => {
-      const result = generateConflationApplicationArtifactsFromTrustedDiscovery(
-        modifiedBase,
-        patch,
-        discovery,
-        base,
-        options.conflation?.decisions ?? [],
-      );
-      return { value: result, operations: changesetCounts(result.changeset.stats) };
-    });
-    modifiedBase = await recorder.measure("apply-conflation-changes", () => {
-      // Production installs the exact result already materialized and validated
-      // during generation. Keep this boundary visible without doing the work twice.
-      const result = conflation.result;
-      return {
-        value: result,
-        operations: {
-          ...changesetCounts(conflation.changeset.stats),
-          ...prefixedCounts("output", osmEntityCounts(result)),
-        },
-      };
-    });
-  }
-
-  if (options.createIntersections) {
-    const changeset = await recorder.measure("prepare-intersection-changeset", () => ({
-      value: new OsmChangeset(modifiedBase),
-      operations: prefixedCounts("base", osmEntityCounts(modifiedBase)),
-    }));
-    await recorder.measure("create-safe-intersections", () => {
-      let waysChecked = 0;
-      for (const _result of changeset.createIntersectionsForWaysGenerator(patch.ways)) {
-        waysChecked++;
-      }
-      return {
-        value: undefined,
-        operations: { ...changesetCounts(changeset.stats), waysChecked },
-      };
-    });
-    modifiedBase = await recorder.measure("apply-intersection-changes", () => {
-      const result = applyChangesetToOsm(changeset);
-      return {
-        value: result,
-        operations: {
-          ...changesetCounts(changeset.stats),
-          ...prefixedCounts("output", osmEntityCounts(result)),
-        },
-      };
-    });
-  }
+  const plan = planMerge(base, patch, options, () => {}, {
+    phase: (name, run, stats) =>
+      recorder.measureSync(`plan-${name}`, () => {
+        const value = run();
+        return { value, operations: changesetCounts(stats()) };
+      }),
+  });
+  const modifiedBase = await recorder.measure("apply-plan", () => {
+    const { osm, stats } = applyPlan(plan);
+    return {
+      value: osm,
+      operations: {
+        ...changesetCounts(stats),
+        ...prefixedCounts("output", osmEntityCounts(osm)),
+      },
+    };
+  });
 
   const fingerprints = await collectFingerprints(
     recorder,
@@ -423,101 +312,6 @@ export async function profileMerge(
     stages: recorder.stages,
     inputs: { base: osmEntityCounts(base), patch: osmEntityCounts(patch) },
     output: osmEntityCounts(modifiedBase),
-    fingerprints,
-    wallDurationMs: roundMilliseconds(performance.now() - wallStarted),
-    processPeakRssBytes: memorySnapshot().peakRss,
-  };
-}
-
-/**
- * Profile the production worker conflation path, including routing diagnostics,
- * the automatic-attachment CAR projection, and installation of the materialized result.
- */
-export async function profileWorkerConflation(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  profileOptions: ProfileMergeOptions = {},
-): Promise<MergeProfileRun> {
-  if (!options.conflation) throw Error("Worker conflation profiling requires conflation options");
-  if (!options.directMerge) throw Error("Worker conflation profiling requires directMerge");
-  const recorder = new MergeProfileRecorder();
-  const wallStarted = performance.now();
-  const worker = new ProfileOsmixWorker();
-  await recorder.measure("register-worker-inputs", () => {
-    worker.register(base);
-    worker.register(patch);
-    return {
-      value: undefined,
-      operations: {
-        ...prefixedCounts("base", osmEntityCounts(base)),
-        ...prefixedCounts("patch", osmEntityCounts(patch)),
-      },
-    };
-  });
-
-  await recorder.measure("worker-discover-conflation-candidates", () => {
-    const summary = worker.discoverConflation(base.id, patch.id, options.conflation!);
-    return { value: undefined, operations: prefixedCounts("candidate", summary) };
-  });
-  const generation = await recorder.measure("worker-generate-conflation-changeset", () => {
-    const result = worker.generateConflationChangeset(base.id, {
-      directMerge: true,
-      deduplicateNodes: options.deduplicateNodes ?? false,
-      deduplicateWays: options.deduplicateWays ?? false,
-      createIntersections: false,
-    });
-    return {
-      value: result,
-      operations: {
-        ...changesetCounts(result.stats),
-        ...routingDiagnosticCounts(result.routing),
-      },
-    };
-  });
-  await recorder.measure("worker-apply-conflation-result", () => {
-    worker.applyChangesAndReplace(base.id);
-    const result = worker.read(base.id);
-    return {
-      value: undefined,
-      operations: {
-        ...changesetCounts(generation.stats),
-        ...prefixedCounts("output", osmEntityCounts(result)),
-      },
-    };
-  });
-
-  if (options.createIntersections) {
-    const stats = await recorder.measure("worker-create-safe-intersections", async () => {
-      const result = await worker.generateChangeset(base.id, patch.id, {
-        createIntersections: true,
-      });
-      return { value: result, operations: changesetCounts(result) };
-    });
-    await recorder.measure("worker-apply-intersection-changes", () => {
-      worker.applyChangesAndReplace(base.id);
-      const result = worker.read(base.id);
-      return {
-        value: undefined,
-        operations: {
-          ...changesetCounts(stats),
-          ...prefixedCounts("output", osmEntityCounts(result)),
-        },
-      };
-    });
-  }
-
-  const output = worker.read(base.id);
-  const fingerprints = await collectFingerprints(
-    recorder,
-    output,
-    profileOptions.fingerprint ?? true,
-  );
-  return {
-    run: profileOptions.run ?? 1,
-    stages: recorder.stages,
-    inputs: { base: osmEntityCounts(base), patch: osmEntityCounts(patch) },
-    output: osmEntityCounts(output),
     fingerprints,
     wallDurationMs: roundMilliseconds(performance.now() - wallStarted),
     processPeakRssBytes: memorySnapshot().peakRss,

@@ -69,6 +69,17 @@ void test("shortbread server app serves readiness and tiles without opening a po
   const styleBody = (await style.json()) as { sources: Record<string, { tiles?: string[] }> };
   const tileUrls = Object.values(styleBody.sources).flatMap((source) => source.tiles ?? []);
   assert.ok(tileUrls.some((url) => url === "https://shortbread.osmix.localhost/tiles/{z}/{x}/{y}"));
+
+  // Behind a TLS-terminating proxy the request arrives over HTTP; tile URLs must keep the
+  // browser's origin or they fail CORS.
+  const proxied = await app.request("http://shortbread.osmix.localhost/style.json", {
+    headers: { "x-forwarded-proto": "https", "x-forwarded-host": "shortbread.osmix.localhost" },
+  });
+  const proxiedBody = (await proxied.json()) as { sources: Record<string, { tiles?: string[] }> };
+  const proxiedUrls = Object.values(proxiedBody.sources).flatMap((source) => source.tiles ?? []);
+  assert.ok(
+    proxiedUrls.some((url) => url === "https://shortbread.osmix.localhost/tiles/{z}/{x}/{y}"),
+  );
 });
 
 void test("shortbread server app turns tile failures into a useful response", async () => {

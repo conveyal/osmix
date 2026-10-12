@@ -11,9 +11,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./internal/changeset-options": "./src/internal/changeset-options.ts",
-    "./internal/conflation": "./src/internal/conflation.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -24,6 +22,7 @@
   "dependencies": {
     "@osmix/core": "workspace:*",
     "@osmix/geo": "workspace:*",
+    "@osmix/router": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
     "dequal": "catalog:"

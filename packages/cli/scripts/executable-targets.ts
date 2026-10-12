@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-export type ExecutableTargetId =
+type ExecutableTargetId =
   | "macos-arm64"
   | "macos-x64"
   | "linux-arm64-glibc"
@@ -94,7 +94,7 @@ export const executableTargets: readonly ExecutableTarget[] = [
 
 export const executableRoot = join(import.meta.dirname, "../dist/executables");
 export const executableDependencyRoot = join(import.meta.dirname, "../dist/executable-native-deps");
-export const hostExecutableName = process.platform === "win32" ? "osmix.exe" : "osmix";
+const hostExecutableName = process.platform === "win32" ? "osmix.exe" : "osmix";
 export const hostExecutablePath = join(executableRoot, "host", hostExecutableName);
 export const releaseExecutableDirectory = join(executableRoot, "release");
 

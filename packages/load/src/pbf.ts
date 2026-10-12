@@ -25,12 +25,12 @@ import type {
   OsmRelation,
   OsmWay,
 } from "@osmix/types";
+import { isRestrictionRelation } from "@osmix/types/utils";
 
 import { createReadableEntityStreamFromOsm } from "./entity-stream.ts";
 import {
   type ExtractTagFilterRules,
   hasExtractTagFilter,
-  nodeMatchesExtractTagRules,
   normalizeTagFilterRules,
   relationMatchesExtractTagRules,
   wayMatchesExtractTagRules,
@@ -49,6 +49,7 @@ import {
   type OsmLoadProfile,
   type OsmSpatialIndexSelection,
 } from "./load-profile.ts";
+import { pruneUnreferencedNodes } from "./prune-nodes.ts";
 
 /** When `extractBbox` is set but `extractStrategy` is omitted, default to in-stream simple extract. */
 function resolveEffectiveExtractStrategy(
@@ -76,10 +77,8 @@ export interface OsmFromPbfOptions extends OsmOptions {
   loadProfile: OsmLoadProfile;
   /** Runtime memory limits used when resolving the Auto profile. */
   loadCapabilities: OsmLoadCapabilities;
-  /** Exact spatial indexes to build. Takes precedence over all profile options. */
+  /** Exact spatial indexes to build. Takes precedence over `loadProfile`. */
   spatialIndexes: OsmSpatialIndexSelection;
-  /** @deprecated Prefer loadProfile. Preserved for exact entity-type selection. */
-  buildSpatialIndexes: OsmEntityType[];
 }
 
 /** A direct-reference PBF load requires standard nodes-before-ways ordering. */
@@ -146,18 +145,18 @@ function toCoreLoadDiagnostics(
   };
 }
 
+/**
+ * Node tag rules are not applied here: nodes stream before the ways that reference them, so
+ * `pruneUnreferencedNodes` applies them after ingestion.
+ */
 function composeNodeIngestFilter(
   bboxFilter: ((node: OsmNode) => boolean) | undefined,
-  tagRules: ExtractTagFilterRules | null,
   entityFilter: OsmFromPbfOptions["filter"] | undefined,
   osm: Osm,
 ): ((node: OsmNode) => boolean) | undefined {
-  const applyNodeTags = tagRules !== null && tagRules.nodes.length > 0;
-  if (!bboxFilter && !applyNodeTags && !entityFilter) return undefined;
+  if (!bboxFilter && !entityFilter) return undefined;
   return (node: OsmNode) => {
     if (bboxFilter && !bboxFilter(node)) return false;
-    // Dense node tag filtering may leave orphan refs when nodes precede ways in a block.
-    if (applyNodeTags && !nodeMatchesExtractTagRules(node, tagRules!)) return false;
     if (entityFilter && !entityFilter("node", node, osm)) return false;
     return true;
   };
@@ -249,7 +248,7 @@ export async function* startCreateOsmFromPbf(
   const tagRulesActive = tagRules !== null && hasExtractTagFilter(tagRules) ? tagRules : null;
   const entityFilter = options.filter;
   const { header, blocks } = await readOsmPbf(data);
-  const osm = new Osm({
+  let osm = new Osm({
     ...options,
     header,
   });
@@ -274,12 +273,7 @@ export async function* startCreateOsmFromPbf(
         }
       : undefined;
 
-  const nodeIngestFilter = composeNodeIngestFilter(
-    simpleSpatialNodeFilter,
-    tagRulesActive,
-    entityFilter,
-    osm,
-  );
+  const nodeIngestFilter = composeNodeIngestFilter(simpleSpatialNodeFilter, entityFilter, osm);
 
   let blockCount = 0;
   let wayIngestionStarted = false;
@@ -337,6 +331,10 @@ export async function* startCreateOsmFromPbf(
                   return false;
                 });
                 if (members.length === 0) return null;
+                // A restriction missing a member would restrict the wrong turn.
+                if (isRestrictionRelation(relation) && members.length < relation.members.length) {
+                  return null;
+                }
                 return {
                   ...relation,
                   members,
@@ -369,6 +367,17 @@ export async function* startCreateOsmFromPbf(
   osm.buildIndexes();
   entityIndexesMs += performance.now() - entityIndexesStartedAt;
 
+  if (tagRulesActive !== null && tagRulesActive.nodes.length > 0) {
+    yield progressEvent("Removing nodes not referenced or matched by the node tag filter...");
+    const sourceNodeCount = osm.nodes.size;
+    const pruneStartedAt = performance.now();
+    osm = pruneUnreferencedNodes(osm, tagRulesActive.nodes);
+    entityIndexesMs += performance.now() - pruneStartedAt;
+    yield progressEvent(
+      `Removed ${(sourceNodeCount - osm.nodes.size).toLocaleString()} unreferenced nodes.`,
+    );
+  }
+
   const projection = projectOsmLoad(osm);
   let decision: OsmLoadDecision;
   if (options.spatialIndexes !== undefined) {
@@ -379,16 +388,6 @@ export async function* startCreateOsmFromPbf(
     );
   } else if (options.loadProfile !== undefined) {
     decision = selectOsmLoadProfile(options.loadProfile, projection, options.loadCapabilities);
-  } else if (Array.isArray(options.buildSpatialIndexes)) {
-    decision = selectOsmSpatialIndexes(
-      {
-        nodes: options.buildSpatialIndexes.includes("node") ? ["all"] : [],
-        ways: options.buildSpatialIndexes.includes("way"),
-        relations: options.buildSpatialIndexes.includes("relation"),
-      },
-      projection,
-      options.loadCapabilities,
-    );
   } else {
     decision = selectOsmLoadProfile("full", projection, options.loadCapabilities);
   }

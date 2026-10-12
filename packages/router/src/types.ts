@@ -127,6 +127,20 @@ export interface PathSegment {
   cost: number;
 }
 
+/** Extra graph data that some routing algorithms need. */
+export interface RoutingAlgorithmContext {
+  /**
+   * Incoming edges of a node. In each returned edge, `targetNodeIndex` is the
+   * edge's source node. Required by `bidirectional`.
+   */
+  reverseGraph?: (nodeIndex: number) => GraphEdge[];
+  /**
+   * Fastest edge speed in the graph, in meters per second. Bounds the A* time
+   * heuristic so it never overestimates. Default: 130 km/h.
+   */
+  maxSpeedMps?: number;
+}
+
 /** Function signature for routing algorithms. */
 export type RoutingAlgorithmFn = (
   graph: (nodeIndex: number) => GraphEdge[],
@@ -135,4 +149,5 @@ export type RoutingAlgorithmFn = (
   getEdgeWeight: (edge: GraphEdge) => number,
   getNodeCoord?: (nodeIndex: number) => LonLat | undefined,
   metric?: RoutingMetric,
+  context?: RoutingAlgorithmContext,
 ) => PathSegment[] | null;

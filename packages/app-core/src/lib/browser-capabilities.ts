@@ -45,7 +45,8 @@ async function runBufferCeilingProbe(kind: BufferKind): Promise<number | null> {
   }
 }
 
-function reportedDeviceMemoryBytes(): number | undefined {
+/** The browser's reported memory class in bytes (Chromium only, at most 8 GiB), if any. */
+export function reportedDeviceMemoryBytes(): number | undefined {
   const gib = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
   return typeof gib === "number" && Number.isFinite(gib) && gib > 0 ? gib * 2 ** 30 : undefined;
 }

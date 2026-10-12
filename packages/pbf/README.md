@@ -114,6 +114,8 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 
 - Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream` (modern browsers, Node 24+, Bun).
 - Only `zlib_data` blobs are supported; files with `raw` or `lzma` payloads will throw.
+- A blob header can be at most 64 KiB and a blob at most 32 MiB (compressed or raw). The writer warns above 16 MiB and puts at most 8,000 entities in each block.
+- IDs and deltas are read as JavaScript numbers, so they are exact to ±2^53.
 - When working with Node `Readable` / `Writable` streams, adapt them to Web Streams (`stream/web`) first.
 
 ### Memory Guidance
@@ -121,6 +123,7 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 - Prefer streaming transforms (`OsmPbfBytesToBlocksTransformStream` → `OsmBlocksToPbfBytesTransformStream`) for large extracts.
 - Materializing full files requires memory proportional to input size plus compression buffers.
 - In browsers, watch heap limits (typically 2–4 GB).
+- See [docs/limits.md](../../docs/limits.md) for the memory that a loaded dataset uses.
 
 ## Development
 

@@ -14,7 +14,7 @@ pnpm install
 pnpm run dev
 ```
 
-The server starts through Portless at `https://vt.osmix.localhost` and loads the Monaco fixture PBF from the repo. Branch worktrees add their branch as a prefix; detached worktrees use their Git worktree ID. Set `PORTLESS=0` to bypass the proxy and use the direct `HOST`/`PORT` server settings (default `127.0.0.1:3000`).
+From the repo root, this starts the server through Portless at `https://vt-server.osmix.localhost`, with the other apps. Branch worktrees add their branch as a prefix. From this directory, `pnpm run dev` starts only this server, without Portless, on the `HOST`/`PORT` settings (default `127.0.0.1:3000`). The server loads the Monaco fixture PBF from the repo.
 
 ## Endpoints
 

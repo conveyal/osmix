@@ -190,6 +190,16 @@ export function describeOsmLoadFailure(
     };
   }
 
+  if (technical.code === "OSM_SLOT_CONFLICT") {
+    return {
+      title,
+      summary: technical.message,
+      suggestion: "Choose a different file.",
+      activityMessage: `${context.sourceName} failed: ${technical.message}`,
+      technical,
+    };
+  }
+
   if (technical.code === "OSM_SPATIAL_INDEX_BUILD_FAILED") {
     return {
       title,

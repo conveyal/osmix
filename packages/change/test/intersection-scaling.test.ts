@@ -46,7 +46,7 @@ describe("intersection junction scaling", () => {
         }));
       }
       let pendingEntryVisits = 0;
-      changeset.wayChanges = new Proxy(changeset.wayChanges, {
+      changeset.overlay.wayChanges = new Proxy(changeset.overlay.wayChanges, {
         ownKeys(target) {
           const keys = Reflect.ownKeys(target);
           pendingEntryVisits += keys.length;

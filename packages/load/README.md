@@ -155,6 +155,20 @@ const transit = await fromPbf(regionPbf, {
 console.log(transit.id);
 ```
 
+Way and relation rules select the ways and relations to keep. Node rules select only standalone nodes: every node that a kept way references, and every node member of a kept relation, is kept whatever its tags. So a node rule never breaks way geometry. Nodes stream before the ways that reference them, so node rules are applied after ingestion by `pruneUnreferencedNodes`. With no node rules, every node is kept. Tag filters select entities; they never remove tags from them.
+
+`CONVEYAL_EXTRACT_TAG_FILTERS` keeps what [R5](https://github.com/conveyal/r5) reads to build a transit network: highways, platforms, park and ride ways and nodes, and turn restrictions. The node tags R5 reads on street vertices (for example `highway=traffic_signals`) survive because street vertices are always kept.
+
+### Turn restrictions
+
+A router skips a turn restriction when one of its members is absent from the file, but a restriction with a member removed from its member list can restrict the wrong turn. So extracts never remove members from a `type=restriction` relation:
+
+| Strategy                      | A restriction the extract cuts                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| None (tag filters only)       | Kept with all members listed, even when a member way was filtered out                |
+| `"simple"`, `"complete_ways"` | Dropped                                                                              |
+| `"smart"`                     | Completed with its member ways and their nodes; dropped if the source lacks a member |
+
 ### Stream PBF to JSON entities
 
 ```ts check-docs monaco-pbf
@@ -197,6 +211,7 @@ for await (const entity of stream) {
 | `ExtractTagFilterRules`          | Per-entity-type tag rule lists (`nodes`, `ways`, `relations`) |
 | `CONVEYAL_EXTRACT_TAG_FILTERS`   | Default transit / routing-oriented tag rules                  |
 | `normalizeTagFilterRules`        | Trim keys, drop blanks, normalize values                      |
+| `pruneUnreferencedNodes`         | Drop nodes no way or relation references and no rule matches  |
 | `hasExtractTagFilter`            | Whether any rule list is non-empty after normalization        |
 | `nodeMatchesExtractTagRules`     | Test a node against normalized rules                          |
 | `wayMatchesExtractTagRules`      | Test a way against normalized rules                           |
@@ -213,7 +228,6 @@ for await (const entity of stream) {
 - `loadProfile` – `"auto"`, `"full"`, or `"view"`; defaults to `"full"`
 - `loadCapabilities` – advisory device-memory and tested buffer-ceiling inputs used by Auto
 - `spatialIndexes` – explicit `OsmSpatialIndexSelection`; takes precedence over `loadProfile`
-- `buildSpatialIndexes` – deprecated compatibility alias for entity-type selection
 
 ## Related Packages
 
@@ -227,7 +241,11 @@ for await (const entity of stream) {
 - Requires Web Streams and `CompressionStream` / `DecompressionStream` (Node 24+, Bun, modern browsers).
 - `fromPbf` expects dense-node blocks; sparse node encodings throw.
 - `"simple"` in-stream bbox filtering may leave incomplete way geometry at boundaries; prefer `"complete_ways"` or `"smart"` for topology-safe extracts.
-- Tag filtering on dense nodes may drop refs when nodes precede ways in a block; use post-load `createExtract` when reference completeness matters.
+- `createExtract` selects ways only by their nodes inside the bbox and adds entities in ascending ID order. With `"smart"`, multipolygon members missing from the source file (for example boundaries cut at a regional file's edge) are dropped and reported through `onProgress`. Membership is tracked as bitsets over source entity indexes, so memory scales with the source dataset (about 1 bit per entity per tracking set) rather than hitting JS `Set` limits.
+- Node tag rules are applied after the whole file is loaded, so a tag-filtered load has the same peak memory as an unfiltered one.
+- Ways that reference nodes absent from the source file keep those refs (`missingRefIds`), and export writes them as they are. Some consumers fail on them: R5 can fail to build a network when such a way is the `via` way of a turn restriction.
+- Auto selects Full only when the all-node index is at most 256 MiB (67,108,864 nodes), the projected typed-array peak is below both 4 GiB and 40% of the device memory, and each allocation is below 80% of the tested buffer ceiling. The values are exported as `AUTO_LOAD_PROFILE_LIMITS`.
+- Memory after a Full load is about 5× the PBF file size. The peak during the load is about 6× to 7×. See [docs/limits.md](../../docs/limits.md#measured-memory-use) for measurements.
 - View supports simple in-stream extraction. Complete/smart extraction, deduplication, routing, and other
   arbitrary-node spatial operations require Full; callers must reload or explicitly build the all-node
   capability.

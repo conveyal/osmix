@@ -11,6 +11,8 @@ interface DirectionCase {
   roundabout?: boolean;
   reversed?: boolean;
   compatible: boolean;
+  /** The imported direction is one the planner does not understand. */
+  unsupported?: boolean;
 }
 
 const directionCases: DirectionCase[] = [
@@ -55,18 +57,21 @@ const directionCases: DirectionCase[] = [
     base: "reversible",
     patch: "reversible",
     compatible: false,
+    unsupported: true,
   },
   {
     name: "matching unsupported alternating values",
     base: "alternating",
     patch: "alternating",
     compatible: false,
+    unsupported: true,
   },
   {
     name: "matching whitespace-padded values",
     base: " yes ",
     patch: " yes ",
     compatible: false,
+    unsupported: true,
   },
 ];
 
@@ -186,10 +191,17 @@ function createRoundabout(
 describe("way direction compatibility", () => {
   it.each(directionCases)("exact reconciliation respects $name", async (testCase) => {
     const { base, patch } = createFixture(testCase, true);
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, () => {});
-    expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
-    expect(result.ways.ids.has(20)).toBe(!testCase.compatible);
-    if (!testCase.compatible) expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
+    const result = await merge(base, patch, { createIntersections: false }, () => {});
+    if (testCase.unsupported) {
+      expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
+      expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
+      return;
+    }
+    // The imported values win; an equivalent direction keeps the base's spelling (MP-X3).
+    expect(result.ways.ids.has(20)).toBe(false);
+    const tags = result.ways.getById(10)?.tags;
+    expect(tags?.["name"]).toBe("Imported");
+    expect(tags?.["oneway"]).toBe(testCase.compatible ? testCase.base : testCase.patch);
   });
 
   it.each([...directionCases, ...reverseCases])(
@@ -206,7 +218,12 @@ describe("way direction compatibility", () => {
         propertyTransfer: { status: testCase.compatible ? "automatic" : "blocked" },
       });
       if (!testCase.compatible) expect(candidate?.reasons).toContain("routing-family-conflict");
-      const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
+      const result = await merge(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+        () => {},
+      );
       expect(result.ways.getById(10)?.tags?.["name"]).toBe(
         testCase.compatible ? "Imported" : "Base",
       );
@@ -218,7 +235,7 @@ describe("way direction compatibility", () => {
 
   it("keeps exact reconciliation's ordered-reference requirement for reversed geometry", async () => {
     const { base, patch } = createFixture(reverseCases[0]!, true);
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, () => {});
+    const result = await merge(base, patch, { createIntersections: false }, () => {});
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
     expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
   });
@@ -276,7 +293,12 @@ describe("way direction compatibility", () => {
       if (!compatible) {
         expect(discovery.candidates[0]?.reasons).toContain("routing-family-conflict");
       }
-      const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
+      const result = await merge(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+        () => {},
+      );
       expect(result.ways.getById(10)?.tags?.["name"]).toBe(compatible ? "Imported" : "Base");
       expect(result.ways.getById(10)?.refs).toEqual([1, 2, 3, 4, 1]);
       expect(result.ways.getById(10)?.tags?.["oneway"]).toBe(baseOneway);

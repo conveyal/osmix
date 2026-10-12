@@ -5,7 +5,7 @@ import type { OsmixAppRemote } from "../remote.ts";
 const remoteBaseAtom = atom<OsmixAppRemote | null>(null);
 
 /**
- * The app's worker remote. Each app creates one with `createOsmixAppRemote()` and sets it on
+ * The app's worker remote. The app creates one with `createOsmixAppRemote()` and sets it on
  * its jotai store during bootstrap; atoms and hooks read it from here instead of importing a
  * module-level singleton. Reading before it is set is a programming error and throws.
  */

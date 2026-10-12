@@ -1,8 +1,15 @@
-import { Menu } from "@base-ui/react/menu";
-import { fetchOsmFileFromUrl, Log } from "@osmix/app-core";
+import { fetchOsmFileFromUrl, Tasks } from "@osmix/app-core";
 import {
   ActionButton,
   Button,
+  bytesSizeToHuman,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -10,11 +17,24 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
   Input,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+  NativeSelect,
+  NativeSelectOption,
+  useTaskLock,
 } from "@osmix/ui";
-import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 /** File type options with labels and accepted extensions */
 const FILE_TYPE_OPTIONS: {
@@ -71,14 +91,12 @@ export default function OsmPbfFileInput({
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {!file ? (
-          <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
-        ) : (
-          <OsmPbfClearFileButton disabled={disabled} clearFile={() => setFile(null)} />
-        )}
-      </div>
+    <div className="flex min-w-0 flex-1 flex-col gap-3">
+      {!file ? (
+        <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
+      ) : (
+        <OsmPbfSelectedFile file={file} disabled={disabled} clearFile={() => setFile(null)} />
+      )}
       {loadProfile && onLoadProfileChange ? (
         <OsmLoadProfileSelector
           disabled={disabled}
@@ -112,6 +130,59 @@ const LOAD_PROFILE_OPTIONS: Array<{
   },
 ];
 
+/** Narrow a `<select>` value to a known load profile; the options are the only source. */
+function parseLoadProfile(value: string): OsmLoadProfile {
+  const option = LOAD_PROFILE_OPTIONS.find((o) => o.value === value);
+  if (!option) throw Error(`Unknown load profile: ${value}`);
+  return option.value;
+}
+
+/** Narrow a `<select>` value to a known file type; the options are the only source. */
+function parseFileType(value: string): OsmFileType {
+  const option = FILE_TYPE_OPTIONS.find((o) => o.type === value);
+  if (!option) throw Error(`Unknown file type: ${value}`);
+  return option.type;
+}
+
+/**
+ * The load profile, collapsed behind a small "Load profile: Auto" toggle that names the current
+ * choice. It is an expert setting, so it stays out of the way of "Open file". `trigger` is
+ * where the toggle goes (for example, in a row beside "Open from URL"); the selector opens below.
+ */
+export function OsmLoadProfileDisclosure({
+  disabled,
+  onChange,
+  trigger,
+  value,
+}: {
+  disabled?: boolean;
+  onChange: (profile: OsmLoadProfile) => void;
+  trigger?: (toggle: ReactNode) => ReactNode;
+  value: OsmLoadProfile;
+}) {
+  const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
+  const toggle = (
+    <CollapsibleTrigger
+      className="group"
+      render={<Button variant="ghost" size="sm" disabled={disabled} />}
+    >
+      Load profile: {selected.label}
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="transition-transform group-data-panel-open:rotate-180"
+      />
+    </CollapsibleTrigger>
+  );
+  return (
+    <Collapsible defaultOpen={false}>
+      {trigger ? trigger(toggle) : toggle}
+      <CollapsibleContent className="pt-2">
+        <OsmLoadProfileSelector disabled={disabled} value={value} onChange={onChange} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function OsmLoadProfileSelector({
   disabled,
   onChange,
@@ -122,44 +193,51 @@ export function OsmLoadProfileSelector({
   value: OsmLoadProfile;
 }) {
   const id = useId();
+  const descriptionId = useId();
   const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
   return (
-    <div className="flex flex-col gap-1 rounded border bg-muted/50 p-2">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="font-medium">
-          Advanced load profile
-        </label>
-        <select
-          id={id}
-          aria-label="PBF load profile"
-          className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-          disabled={disabled}
-          value={value}
-          onChange={(event) => onChange(event.target.value as OsmLoadProfile)}
-        >
-          {LOAD_PROFILE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="text-muted-foreground">{selected.description}</div>
-    </div>
+    <Field orientation="horizontal">
+      <FieldContent>
+        <FieldLabel htmlFor={id}>Load profile</FieldLabel>
+        <FieldDescription id={descriptionId}>{selected.description}</FieldDescription>
+      </FieldContent>
+      <NativeSelect
+        id={id}
+        aria-describedby={descriptionId}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(parseLoadProfile(e.target.value))}
+      >
+        {LOAD_PROFILE_OPTIONS.map((option) => (
+          <NativeSelectOption key={option.value} value={option.value}>
+            {option.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </Field>
   );
 }
 
+/**
+ * "Open file": the first action of every flow, so it is the primary (ink) button by default.
+ * Pass `primary={false}` when another slot's Open file is the next step (Merge's patch input
+ * while the base is still empty), so only one primary action shows at a time.
+ */
 export function OsmPbfSelectFileButton({
   disabled,
   pbfOnly,
+  primary = true,
   setFile,
 }: {
   disabled?: boolean;
   /** Skip format menu and open only `.pbf` / `.osm.pbf`. */
   pbfOnly?: boolean;
+  primary?: boolean;
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
+  const variant = primary ? "default" : "outline";
   const [isLoading, setIsLoading] = useState(false);
+  const locked = useTaskLock();
 
   const handleSelectFileType = async (fileType: OsmFileType) => {
     const option = FILE_TYPE_OPTIONS.find((opt) => opt.type === fileType);
@@ -180,8 +258,9 @@ export function OsmPbfSelectFileButton({
     return (
       <Button
         type="button"
-        disabled={disabled || isLoading}
-        className="flex-1 w-full"
+        variant={variant}
+        disabled={disabled || isLoading || locked}
+        className="w-full"
         onClick={async () => {
           setIsLoading(true);
           try {
@@ -192,41 +271,28 @@ export function OsmPbfSelectFileButton({
           }
         }}
       >
-        <FilesIcon />
-        Select PBF
+        <FilesIcon aria-hidden="true" />
+        Open file
       </Button>
     );
   }
 
   return (
-    <Menu.Root>
-      <Menu.Trigger
-        disabled={disabled || isLoading}
-        className="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3 flex-1"
-      >
-        <FilesIcon />
+    <Menu>
+      <MenuTrigger variant={variant} disabled={disabled || isLoading || locked} className="w-full">
+        <FilesIcon aria-hidden="true" />
         Open file
-        <ChevronDownIcon className="ml-auto" />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner className="z-50" sideOffset={4}>
-          <Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-            {FILE_TYPE_OPTIONS.map((option) => (
-              <Menu.Item
-                key={option.type}
-                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                onClick={() => handleSelectFileType(option.type)}
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{option.label}</span>
-                  <span className="text-muted-foreground">{option.description}</span>
-                </div>
-              </Menu.Item>
-            ))}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+        <ChevronDownIcon aria-hidden="true" className="ml-auto" />
+      </MenuTrigger>
+      <MenuContent>
+        {FILE_TYPE_OPTIONS.map((option) => (
+          <MenuItem key={option.type} onClick={() => void handleSelectFileType(option.type)}>
+            <span className="font-medium">{option.label}</span>
+            <span className="text-muted-foreground">{option.description}</span>
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 
@@ -240,13 +306,17 @@ export function OsmPbfOpenUrlButton({
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const locked = useTaskLock();
   const [url, setUrl] = useState("");
   const [selectedFileType, setSelectedFileType] = useState<OsmFileType>("pbf");
+  const fileTypeId = useId();
+  const urlId = useId();
 
+  // A secondary way in, so it stays quiet beside the primary "Open file".
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="flex-1" variant="outline" disabled={disabled} />}>
-        <LinkIcon />
+      <DialogTrigger render={<Button variant="ghost" size="sm" disabled={disabled || locked} />}>
+        <LinkIcon aria-hidden="true" />
         Open from URL
       </DialogTrigger>
       <DialogContent>
@@ -261,40 +331,32 @@ export function OsmPbfOpenUrlButton({
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <div className="font-medium">File Type</div>
-            <Menu.Root>
-              <Menu.Trigger className="cursor-pointer inline-flex items-center justify-between gap-2 whitespace-nowrap rounded-md font-medium border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 w-full">
-                {FILE_TYPE_OPTIONS.find((o) => o.type === selectedFileType)?.label ??
-                  "Select file type"}
-                <ChevronDownIcon />
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner className="z-50" sideOffset={4}>
-                  <Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-                    {FILE_TYPE_OPTIONS.map((option) => (
-                      <Menu.Item
-                        key={option.type}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        onClick={() => setSelectedFileType(option.type)}
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium">{option.label}</span>
-                          <span className="text-muted-foreground">{option.description}</span>
-                        </div>
-                      </Menu.Item>
-                    ))}
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
+            <label htmlFor={fileTypeId} className="font-medium">
+              File type
+            </label>
+            <NativeSelect
+              id={fileTypeId}
+              className="w-full"
+              value={selectedFileType}
+              onChange={(e) => setSelectedFileType(parseFileType(e.target.value))}
+            >
+              {FILE_TYPE_OPTIONS.map((option) => (
+                <NativeSelectOption key={option.type} value={option.type}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <div className="text-muted-foreground">
+              {FILE_TYPE_OPTIONS.find((option) => option.type === selectedFileType)?.description}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="url-input" className="font-medium">
+            <label htmlFor={urlId} className="font-medium">
               URL
             </label>
             <Input
-              id="url-input"
+              id={urlId}
               placeholder="https://example.com/data.osm.pbf"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -309,24 +371,19 @@ export function OsmPbfOpenUrlButton({
           </Button>
           <ActionButton
             disabled={disabled || url.trim().length === 0}
-            icon={<LinkIcon />}
+            icon={<LinkIcon aria-hidden="true" />}
             onAction={async () => {
               if (selectedFileType === "pbf" && openPbfUrl) {
                 await openPbfUrl(url);
                 setOpen(false);
                 return;
               }
-              const task = Log.startTask("Downloading file from URL...");
-              try {
-                const file = await fetchOsmFileFromUrl(url);
-                task.end(`Downloaded ${file.name}`);
-                await setFile(file, selectedFileType);
-                setOpen(false);
-              } catch (e) {
-                const message = e instanceof Error ? e.message : "Unknown error";
-                task.end(`Download failed: ${message}`, "error");
-                throw e;
-              }
+              // The download is its own task; opening the file then starts the load task.
+              const file = await Tasks.run(`Download ${url}`, () => fetchOsmFileFromUrl(url), {
+                summary: (downloaded) => `Downloaded ${downloaded.name}`,
+              });
+              await setFile(file, selectedFileType);
+              setOpen(false);
             }}
           >
             Download and open
@@ -334,6 +391,36 @@ export function OsmPbfOpenUrlButton({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The chosen file, before it is loaded: name, size, and a clear action. */
+export function OsmPbfSelectedFile({
+  file,
+  disabled,
+  clearFile,
+}: {
+  file: File;
+  disabled?: boolean;
+  clearFile: () => Promise<void>;
+}) {
+  return (
+    <Item variant="outline" size="sm" className="flex-nowrap">
+      <ItemMedia variant="icon">
+        <FileIcon aria-hidden="true" />
+      </ItemMedia>
+      <ItemContent className="min-w-0 gap-0">
+        <ItemTitle className="w-full min-w-0">
+          <span className="truncate font-mono" title={file.name}>
+            {file.name}
+          </span>
+        </ItemTitle>
+        <ItemDescription>{bytesSizeToHuman(file.size)}</ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <OsmPbfClearFileButton disabled={disabled} clearFile={clearFile} />
+      </ItemActions>
+    </Item>
   );
 }
 
@@ -348,15 +435,14 @@ export function OsmPbfClearFileButton({
     <ActionButton
       disabled={disabled}
       onAction={clearFile}
-      title="Clear file"
-      icon={<XIcon />}
-      size="icon-sm"
-      variant="ghost"
+      label="Clear file"
+      icon={<XIcon aria-hidden="true" />}
     />
   );
 }
 
-function showFileSelector(accept: string) {
+/** Open the browser file picker for one file of `accept` types; null when cancelled. */
+export function showFileSelector(accept: string) {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = accept;

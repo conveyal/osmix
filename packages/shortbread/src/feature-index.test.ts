@@ -2,6 +2,7 @@ import { pointToTile } from "@mapbox/tilebelt";
 import { VectorTile } from "@mapbox/vector-tile";
 import { Osm } from "@osmix/core";
 import { fromPbf } from "@osmix/load";
+import { assertValue } from "@osmix/shared/assert";
 import { inspectBackingBuffers } from "@osmix/shared/backing-buffers";
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import type { GeoBbox2D, Tile } from "@osmix/types";
@@ -15,6 +16,13 @@ import {
   shortbreadFeatureHasLayer,
   ShortbreadFeatureIndex,
 } from "./feature-index.ts";
+
+/** Bbox of a test dataset that is known to contain nodes. */
+function datasetBbox(dataset: Osm): GeoBbox2D {
+  const bbox = dataset.bbox();
+  assertValue(bbox, "Test dataset has no nodes");
+  return bbox;
+}
 
 function bboxToTile(bbox: GeoBbox2D, z = 14): Tile {
   const [minX, minY, maxX, maxY] = bbox;
@@ -69,23 +77,23 @@ describe("ShortbreadFeatureIndex", () => {
   it("stores only classified candidates and answers spatial queries", () => {
     const osm = createMixedOsm();
     const index = ShortbreadFeatureIndex.build(osm);
-    const records = index.query(osm.bbox());
+    const records = index.query(datasetBbox(osm));
 
     expect(index.size).toBe(2);
     expect(records.map((record) => record.entityType)).toEqual(["node", "way"]);
     expect(shortbreadFeatureHasLayer(records[0]!, "pois")).toBe(true);
     expect(shortbreadFeatureHasLayer(records[1]!, "buildings")).toBe(true);
-    expect(index.queryEntityIndexes(osm.bbox(), "node")).toEqual([0]);
-    expect(index.queryEntityIndexes(osm.bbox(), "way", (entityIndex) => entityIndex > 0)).toEqual(
-      [],
-    );
+    expect(index.queryEntityIndexes(datasetBbox(osm), "node")).toEqual([0]);
+    expect(
+      index.queryEntityIndexes(datasetBbox(osm), "way", (entityIndex) => entityIndex > 0),
+    ).toEqual([]);
     expect(index.query([0, 0, 1, 1])).toEqual([]);
   });
 
   it("filters query records before materializing them", () => {
     const osm = createMixedOsm();
     const index = ShortbreadFeatureIndex.build(osm);
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
 
     expect(index.query({ bbox })).toEqual(index.query(bbox));
     const buildings = index.query({
@@ -120,7 +128,7 @@ describe("ShortbreadFeatureIndex", () => {
 
   it("produces byte-identical tiles through the optional indexed encoder path", () => {
     const osm = createMixedOsm();
-    const tile = bboxToTile(osm.bbox());
+    const tile = bboxToTile(datasetBbox(osm));
     const featureIndex = ShortbreadFeatureIndex.build(osm);
     const unindexed = new Uint8Array(new ShortbreadVtEncoder(osm).getTile(tile));
     const indexed = new Uint8Array(
@@ -141,7 +149,7 @@ describe("ShortbreadFeatureIndex", () => {
     const indexed = new ShortbreadVtEncoder(osm, { featureIndex });
 
     for (const zoom of [10, 14]) {
-      const tile = bboxToTile(osm.bbox(), zoom);
+      const tile = bboxToTile(datasetBbox(osm), zoom);
       const indexedTile = indexed.getTile(tile);
       const unindexedTile = unindexed.getTile(tile);
       expect(new Uint8Array(indexedTile)).toEqual(new Uint8Array(unindexedTile));
@@ -176,7 +184,7 @@ describe("ShortbreadFeatureIndex", () => {
       new ShortbreadVtEncoder(osm),
       new ShortbreadVtEncoder(osm, 4096, 64, index),
     ]) {
-      const layers = decodeTile(encoder.getTile(bboxToTile(osm.bbox())));
+      const layers = decodeTile(encoder.getTile(bboxToTile(datasetBbox(osm))));
       expect(layers["water"]?.length).toBe(1);
       expect(layers["water"]?.feature(0).properties["name"]).toBe("Relation Lake");
     }
@@ -203,7 +211,7 @@ describe("ShortbreadFeatureIndex", () => {
 
     const index = ShortbreadFeatureIndex.build(osm);
     const restored = ShortbreadFeatureIndex.fromTransferables(index.transferables());
-    const tile = bboxToTile(osm.bbox());
+    const tile = bboxToTile(datasetBbox(osm));
     const unindexed = new Uint8Array(new ShortbreadVtEncoder(osm).getTile(tile));
     const indexed = new Uint8Array(
       new ShortbreadVtEncoder(osm, { featureIndex: restored }).getTile(tile),
@@ -245,7 +253,7 @@ describe("ShortbreadFeatureIndex", () => {
       new ShortbreadVtEncoder(osm),
       new ShortbreadVtEncoder(osm, 4096, 64, index),
     ]) {
-      const layers = decodeTile(encoder.getTile(bboxToTile(osm.bbox())));
+      const layers = decodeTile(encoder.getTile(bboxToTile(datasetBbox(osm))));
       expect(layers["streets"]?.length).toBe(1);
     }
   });

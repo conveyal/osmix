@@ -179,12 +179,7 @@ export async function createMergedSyntheticRoutingOsm(): Promise<Osm> {
     roundTripRoutingOsm(createSyntheticRoutingBase()),
     roundTripRoutingOsm(createSyntheticRoutingPatch()),
   ]);
-  return merge(base, patch, {
-    createIntersections: true,
-    deduplicateNodes: true,
-    deduplicateWays: true,
-    directMerge: true,
-  });
+  return merge(base, patch, {});
 }
 
 /**
@@ -245,13 +240,19 @@ export async function createSyntheticConflationRoutingVariants(): Promise<{
     roundTripRoutingOsm(inputs.base, "synthetic-conflation-base-pbf"),
     roundTripRoutingOsm(inputs.patch, "synthetic-conflation-patch-pbf"),
   ]);
-  const ordinary = await merge(base, patch, { directMerge: true }, () => undefined);
+  const ordinary = await merge(
+    base,
+    patch,
+    { mergeIdenticalPoints: false, createIntersections: false },
+    () => undefined,
+  );
   const propertyTransfer = await merge(
     base,
     patch,
     {
-      directMerge: true,
-      conflation: {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: {
         propertyKeys: ["name"],
         attachNetwork: false,
       },
@@ -262,8 +263,9 @@ export async function createSyntheticConflationRoutingVariants(): Promise<{
     base,
     patch,
     {
-      directMerge: true,
-      conflation: {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: {
         propertyKeys: [],
         attachNetwork: true,
       },

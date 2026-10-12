@@ -67,7 +67,8 @@ export interface OsmLoadDiagnostics {
 
 export interface OsmInfo {
   id: string;
-  bbox: GeoBbox2D;
+  /** Bounding box of all nodes, or `null` when the dataset has no nodes. */
+  bbox: GeoBbox2D | null;
   header: OsmPbfHeaderBlock;
   stats: {
     nodes: number;
@@ -201,9 +202,9 @@ export class Osm {
   }
 
   /**
-   * Get the bounding box of all entities in the OSM index.
+   * Get the bounding box of all entities in the OSM index, or `null` when there are no nodes.
    */
-  bbox(): GeoBbox2D {
+  bbox(): GeoBbox2D | null {
     return this.nodes.getBbox();
   }
 

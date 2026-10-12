@@ -95,18 +95,28 @@ describe("Yakima fuzzy conflation", () => {
       expect(discovery.options).toEqual({
         propertyKeys: ["barrier", "crossing", "kerb", "tactile_paving"],
         attachNetwork: true,
+        traceLengthMeters: 10,
         maxDistanceMeters: 1,
         automatic: "high-confidence",
       });
       expect(discovery.summary).toEqual({
         total: 11_689,
         accepted: 0,
-        automatic: 145,
-        review: 212,
-        blocked: 88,
+        // A connection merges its point's tags like an identical-point merge, so a node routing
+        // or barrier difference no longer blocks or reviews it (MP-M3).
+        automatic: 117,
+        review: 124,
+        blocked: 204,
         unmatched: 11_244,
         rejected: 0,
       });
+      // Points along OSW sidewalks drawn beside the OSM sidewalks are copies of those paths,
+      // not junctions (MP-M1): the 147 blocked since that rule.
+      expect(
+        discovery.candidates.filter((candidate) =>
+          candidate.networkAttachment?.reasons.includes("traces-base-way"),
+        ),
+      ).toHaveLength(147);
 
       const matched = discovery.candidates.filter((candidate) => candidate.targetId != null);
       const targetCountBySource = new Map<number, number>();
@@ -124,11 +134,12 @@ describe("Yakima fuzzy conflation", () => {
 
       const accessibleCrossing = getCandidate(discovery, "node:2220318->11643002707");
       expectNonExact(accessibleCrossing, base, patch);
+      // The connection merges the crossing's tags into the base point, so nothing waits.
       expect(accessibleCrossing).toMatchObject({
-        status: "review",
-        reasons: ["node-context-conflict"],
+        status: "automatic",
+        reasons: [],
         propertyTransfer: { status: "automatic", reasons: [] },
-        networkAttachment: { status: "review", reasons: ["node-context-conflict"] },
+        networkAttachment: { status: "automatic", reasons: [] },
         evidence: {
           distanceMeters: 0.40797,
           sourceRoutingFamilies: ["pedestrian"],
@@ -152,34 +163,36 @@ describe("Yakima fuzzy conflation", () => {
         )?.tags,
       ).toMatchObject({ footway: "crossing", highway: "footway" });
 
-      const kerbConflict = getCandidate(discovery, "node:2475012->11643237283");
-      expectNonExact(kerbConflict, base, patch);
-      expect(kerbConflict).toMatchObject({
-        status: "blocked",
-        networkAttachment: {
-          status: "blocked",
-          reasons: expect.arrayContaining(["routing-family-conflict"]),
-        },
+      const kerb = getCandidate(discovery, "node:2475012->11643237283");
+      expectNonExact(kerb, base, patch);
+      // An imported kerb with no kerb value merges into a raised kerb without conflict; only the
+      // choice between two nearby base points waits.
+      expect(kerb).toMatchObject({
+        status: "review",
+        networkAttachment: { status: "review", reasons: ["multiple-targets"] },
       });
-      expect(patch.nodes.getById(kerbConflict.sourceId)?.tags).toMatchObject({
+      expect(patch.nodes.getById(kerb.sourceId)?.tags).toMatchObject({
         barrier: "kerb",
       });
-      expect(patch.nodes.getById(kerbConflict.sourceId)?.tags?.["kerb"]).toBeUndefined();
-      expect(base.nodes.getById(getTargetId(kerbConflict))?.tags).toMatchObject({
+      expect(patch.nodes.getById(kerb.sourceId)?.tags?.["kerb"]).toBeUndefined();
+      expect(base.nodes.getById(getTargetId(kerb))?.tags).toMatchObject({
         barrier: "kerb",
         kerb: "raised",
       });
 
+      // An OSW sidewalk point beside the same OSM sidewalk: the OSW way runs along it, so the
+      // point is a copy of that path and is not connected to it (MP-M1).
       const sidewalk = getCandidate(discovery, "node:2213758->8075647920");
       expectNonExact(sidewalk, base, patch);
       expect(sidewalk).toMatchObject({
-        status: "automatic",
+        status: "blocked",
         propertyTransfer: {
           status: "blocked",
           reasons: ["no-transferable-properties"],
         },
-        networkAttachment: { status: "automatic", reasons: [] },
+        networkAttachment: { status: "blocked", reasons: ["traces-base-way"] },
       });
+      expect(sidewalk.evidence.tracedLengthMeters).toBeGreaterThanOrEqual(10);
       expect(
         getIncidentWays(patch, sidewalk.sourceId).find((way) => way.id === 848575)?.tags,
       ).toMatchObject({ footway: "sidewalk", highway: "footway" });

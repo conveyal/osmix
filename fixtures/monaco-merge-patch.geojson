@@ -1,0 +1,471 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": -1000101,
+      "properties": { "amenity": "bench" },
+      "geometry": { "type": "Point", "coordinates": [7.4398783, 43.7468163] }
+    },
+    {
+      "type": "Feature",
+      "id": 1685061943,
+      "properties": { "barrier": "gate", "material": "metal" },
+      "geometry": { "type": "Point", "coordinates": [7.4306925, 43.7418439] }
+    },
+    {
+      "type": "Feature",
+      "id": 628375511,
+      "properties": { "highway": "footway", "surface": "asphalt" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4392797, 43.7471757],
+          [7.4393181, 43.7468163]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1000401,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4401272, 43.7468163],
+          [7.4401272, 43.7468163],
+          [7.4402766, 43.7468163]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1000501,
+      "properties": { "highway": "crossing", "crossing": "uncontrolled", "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4233732, 43.73701] }
+    },
+    {
+      "type": "Feature",
+      "id": -1000601,
+      "properties": { "highway": "crossing", "crossing": "uncontrolled" },
+      "geometry": { "type": "Point", "coordinates": [7.4317478, 43.7472774] }
+    },
+    {
+      "type": "Feature",
+      "id": -1000701,
+      "properties": { "highway": "footway", "name": "Passage X3" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4298856, 43.7453649],
+          [7.429946, 43.7454177],
+          [7.4299552, 43.745442],
+          [7.4302852, 43.7457401]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1000801,
+      "properties": { "highway": "footway", "name": "Rue Princesse Florestine", "oneway": "yes" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4198313, 43.7332573],
+          [7.4197734, 43.7336922]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1000901,
+      "properties": { "barrier": "gate" },
+      "geometry": { "type": "Point", "coordinates": [7.428742, 43.7422541] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001001,
+      "properties": { "tourism": "viewpoint", "opening_hours": "24/7" },
+      "geometry": { "type": "Point", "coordinates": [7.4241906, 43.7296025] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001002,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4241906, 43.7296025],
+          [7.4241906, 43.7297104]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001101,
+      "properties": { "barrier": "kerb", "kerb": "raised" },
+      "geometry": { "type": "Point", "coordinates": [7.4302532, 43.7418543] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001102,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4302532, 43.7418543],
+          [7.4302532, 43.7419622]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001201,
+      "properties": { "tourism": "viewpoint", "level": "4" },
+      "geometry": { "type": "Point", "coordinates": [7.4173392, 43.7309694] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001202,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4173392, 43.7309694],
+          [7.4173392, 43.7310773]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001301,
+      "properties": { "tourism": "viewpoint", "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4125563, 43.7347814] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001302,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4125563, 43.7347814],
+          [7.4125563, 43.7348893]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001401,
+      "properties": { "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4406252, 43.7468163] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001402,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4406252, 43.7468163],
+          [7.4407746, 43.7468163]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001501,
+      "properties": { "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4260219, 43.7405899] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001502,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4260219, 43.7405899],
+          [7.4261473, 43.7405314]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001601,
+      "properties": { "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4272032, 43.7338173] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001602,
+      "properties": { "tactile_paving": "yes" },
+      "geometry": { "type": "Point", "coordinates": [7.4271924, 43.7338129] }
+    },
+    {
+      "type": "Feature",
+      "id": -1001603,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4272032, 43.7338173],
+          [7.4273325, 43.7338713]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001604,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4271924, 43.7338129],
+          [7.4270631, 43.7337589]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001701,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4250659, 43.7419588],
+          [7.4249473, 43.742063]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001801,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4196504, 43.7378064],
+          [7.419501, 43.7378064]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1001901,
+      "properties": { "highway": "residential" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4268608, 43.7410962],
+          [7.4266118, 43.7410962]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1003101,
+      "properties": { "highway": "footway", "oneway": "yes" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4289637, 43.7376944],
+          [7.4290458, 43.7376573],
+          [7.4292456, 43.7376991],
+          [7.4292588, 43.7376676]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002001,
+      "properties": { "highway": "footway", "surface": "asphalt" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4302609, 43.7467835],
+          [7.430209, 43.7467224],
+          [7.4301195, 43.7465173],
+          [7.4300815, 43.7464764]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002101,
+      "properties": { "highway": "footway", "surface": "asphalt" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4232916, 43.7315729],
+          [7.4233058, 43.7315568],
+          [7.4233347, 43.7315529],
+          [7.423344, 43.7315327],
+          [7.423368, 43.7315248],
+          [7.423385, 43.7315092],
+          [7.4233812, 43.7314875],
+          [7.4234051, 43.731474],
+          [7.4234013, 43.7314523],
+          [7.4234251, 43.7314387],
+          [7.4234214, 43.731417],
+          [7.4234452, 43.7314035],
+          [7.4234414, 43.7313818],
+          [7.4234653, 43.7313683],
+          [7.4234615, 43.7313465],
+          [7.4234784, 43.731331]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002201,
+      "properties": { "highway": "pedestrian", "surface": "asphalt" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4163445, 43.7332282],
+          [7.4163101, 43.7332498],
+          [7.4161329, 43.7330968],
+          [7.4162112, 43.7330402],
+          [7.4163299, 43.7331168],
+          [7.4164204, 43.7331947],
+          [7.4163445, 43.7332282]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002301,
+      "properties": {
+        "highway": "footway",
+        "name": "Rue de Vedel",
+        "oneway": "yes",
+        "surface": "asphalt"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4222457, 43.7308167],
+          [7.4222378, 43.7307702],
+          [7.4222097, 43.7306403],
+          [7.4221902, 43.7305821]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002401,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4206738, 43.7277205],
+          [7.4205012, 43.7277114],
+          [7.4203621, 43.727697]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002501,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4260433, 43.7397988],
+          [7.4257917, 43.739939],
+          [7.425578, 43.7400402]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002502,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4257917, 43.739939],
+          [7.4258851, 43.7400558]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002601,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4209324, 43.7301067],
+          [7.4207984, 43.7302132]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002701,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4199307, 43.7269302],
+          [7.4198001, 43.7268216]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002801,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4304714, 43.7444984],
+          [7.4302868, 43.7445525]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1002901,
+      "properties": { "building": "yes" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [7.4239603, 43.7303324],
+            [7.4238901, 43.7304066],
+            [7.4239928, 43.7304573],
+            [7.424063, 43.7303831],
+            [7.4239603, 43.7303324]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1003001,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4409987, 43.7468163],
+          [7.4412477, 43.7468163]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": -1003002,
+      "properties": { "highway": "footway" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [7.4411232, 43.7469062],
+          [7.4411232, 43.7467264]
+        ]
+      }
+    }
+  ]
+}

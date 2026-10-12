@@ -25,10 +25,11 @@ const block: OsmPbfBlock = {
     {
       nodes: [],
       dense: {
-        id: [1, 1, 1],
-        lat: [0, 1, 9],
-        lon: [0, 1, 9],
-        keys_vals: [1, 2, 0, 1, 2, 0, 3, 4, 0],
+        // Node 4 is the only node no way or relation references.
+        id: [1, 1, 1, 1],
+        lat: [0, 1, 9, 1],
+        lon: [0, 1, 9, 1],
+        keys_vals: [1, 2, 0, 1, 2, 0, 3, 4, 0, 3, 4, 0],
       },
       ways: [
         { id: 100, keys: [5], vals: [6], refs: [1, 1, 1] },
@@ -141,7 +142,7 @@ describe("missing node references", () => {
     ]);
   });
 
-  it("preserves refs and members when tag filtering drops their targets", async () => {
+  it("keeps referenced nodes and drops unreferenced ones under node tag rules", async () => {
     const osm = await fromPbf(
       await createFilteredPbf(),
       {
@@ -155,7 +156,10 @@ describe("missing node references", () => {
       () => {},
     );
 
-    expect(osm.nodes.size).toBe(2);
+    // Node 3 fails the rule but ways and a relation reference it; node 4 is unreferenced.
+    expect(osm.nodes.size).toBe(3);
+    expect(osm.nodes.ids.has(3)).toBe(true);
+    expect(osm.nodes.ids.has(4)).toBe(false);
     expect(osm.ways.size).toBe(4);
     expect(osm.ways.getFullEntity(0, 100).refs).toEqual([1, 2, 3]);
     expect(osm.ways.getFullEntity(1, 102).refs).toEqual([1, 3, 2]);

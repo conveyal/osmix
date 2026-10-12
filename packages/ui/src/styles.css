@@ -1,14 +1,52 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/700.css";
 
 /* Scan this package for utility classes; paths resolve relative to this file. */
 @source "./";
 
+/*
+ * The theme is closed: Tailwind's default palette, shadows, font sizes and font families are
+ * reset, so only the tokens below produce CSS. A raw `bg-slate-200`, `shadow-lg` or `text-2xl`
+ * generates nothing and is flagged by the linter as an unknown class. See DESIGN.md.
+ */
 @theme {
+  --color-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+
+  --font-sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Two sizes only. Components choose the size; call sites never do. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+
+  /* The inset: padding from every edge-aligned surface (sidebar sections, details, table
+     edges, dialogs) to its content, so text lines up at one edge. Inner rhythm stays gap-2. */
+  --spacing-inset: 0.75rem;
+
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 2);
+
+  /* Elevation: "flat" is a border with no shadow; these are the only two shadows. */
+  --shadow-raised: 0 1px 2px var(--shadow-tint), 0 2px 8px -2px var(--shadow-tint);
+  --shadow-modal: 0 4px 12px -2px var(--shadow-tint), 0 16px 32px -8px var(--shadow-tint);
+
+  /* Literal white/black exist only for marks drawn on top of map imagery. */
+  --color-white: oklch(1 0 0);
+  --color-black: oklch(0 0 0);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -23,18 +61,18 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-app: var(--app-hue);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --color-overlay: var(--overlay);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -43,7 +81,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
 
   @keyframes progress-indeterminate {
@@ -57,42 +95,138 @@
   }
 }
 
+/*
+ * "Cartographic instrument": warm paper neutrals, warm ink text, survey orange as the brand
+ * accent. Light only for now; a future dark theme redefines these under a `.dark` selector.
+ */
 :root {
   --radius: 0.125rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: var(--color-slate-800);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.723 0.192 149.579);
-  --warning: oklch(0.769 0.188 70.08);
-  --info: oklch(0.623 0.214 259.815);
-  --border: var(--color-slate-200);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  --background: oklch(0.975 0.008 85);
+  --foreground: oklch(0.23 0.018 60);
+  --card: oklch(0.992 0.004 85);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.27 0.018 60);
+  --primary-foreground: oklch(0.985 0.006 85);
+  --secondary: oklch(0.945 0.011 85);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.952 0.01 85);
+  --muted-foreground: oklch(0.5 0.022 70);
+  --accent: oklch(0.93 0.014 80);
+  --accent-foreground: var(--foreground);
+  --border: oklch(0.885 0.015 80);
+  --input: oklch(0.86 0.016 80);
+  --overlay: oklch(0.23 0.018 60 / 0.4);
+  --shadow-tint: oklch(0.3 0.04 60 / 0.14);
+
+  /* Brand: survey orange. Focus, the brand mark and highlights; never a status. */
+  --brand: oklch(0.67 0.19 45);
+  --brand-foreground: oklch(0.23 0.018 60);
+  /* The focus ring is a deeper orange so it clears 3:1 against paper, cards and borders. */
+  --ring: oklch(0.6 0.18 42);
+
+  /* Per-app hue for the nav brand mark and active app link. OsmixAppShell sets data-app. */
+  --app-hue: var(--brand);
+
+  /* Status: success = added/OK, warning = modified, info = selected/active/links,
+     destructive = deleted/error. */
+  --destructive: oklch(0.56 0.21 27);
+  --destructive-foreground: oklch(0.985 0.006 85);
+  --success: oklch(0.6 0.15 150);
+  --warning: oklch(0.7 0.16 65);
+  --info: oklch(0.55 0.19 258);
+
+  /* The shadcn sidebar's tokens, mapped onto the theme. The sidebar is the reading surface, so
+     it takes the card color; the map frame beside it keeps the muted paper. */
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* The nav's height; the sidebar sits below it. */
+  --header-height: 2.5rem;
+
+  /* Map roles, resolved for MapLibre by `useMapColors()` in @osmix/app-components. */
+  --map-base: oklch(0.3 0.02 60);
+  --map-patch: var(--brand);
+  --map-hover: oklch(0.7 0.15 258);
+  --map-selected: var(--info);
+  --map-casing: oklch(1 0 0);
+  --map-route: var(--info);
+  --map-route-error: var(--destructive);
+  --map-bbox: var(--brand);
+  /* Merge plan outcomes. Each pairs with a label in the plan legend. */
+  --map-outcome-added: var(--success);
+  --map-outcome-replaced: var(--warning);
+  --map-outcome-merged: oklch(0.3 0.02 60);
+  --map-outcome-connected: var(--info);
+  --map-outcome-removed: var(--destructive);
+  --map-outcome-decision: oklch(0.52 0.19 295);
+  --map-outcome-unchanged: var(--muted-foreground);
+}
+
+:root[data-app="merge"] {
+  --app-hue: oklch(0.52 0.19 295);
+}
+
+:root[data-app="inspect"] {
+  --app-hue: oklch(0.55 0.1 190);
+}
+
+:root[data-app="extract"] {
+  --app-hue: oklch(0.55 0.21 350);
+}
+
+/* Sidebar width: 28rem, 32rem on wide windows. The apps are desktop-only (1024px+). */
+[data-slot="sidebar-wrapper"] {
+  --sidebar-width: 28rem;
+
+  @media (width >= 80rem) {
+    --sidebar-width: 32rem;
+  }
+}
+
+/*
+ * Shown only in windows narrower than the apps' supported minimum (1024px, 64rem). The one
+ * viewport switch the apps allow; see "Supported viewports" in DESIGN.md.
+ */
+@utility small-window-only {
+  @media (width >= 64rem) {
+    display: none;
+  }
+}
+
+/* The nav brand mark: a square in the app's hue, offset by the brand orange. */
+@utility brand-mark {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  background-color: var(--app-hue);
+  box-shadow: 0.1875rem 0.1875rem 0 var(--brand);
+}
+
+/* The single focus treatment. Every interactive primitive applies `focus-ring`. */
+@utility focus-ring {
+  outline-style: none;
+
+  /* Not while a native picker is open: macOS draws its menu translucent and the ring shows
+     through it. The :is() keeps the selector valid in browsers without :open. */
+  &:focus-visible:not(:is(:open)) {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+
+  @media (forced-colors: active) {
+    &:focus-visible {
+      outline-color: CanvasText;
+    }
+  }
 }
 
 @layer base {
@@ -103,29 +237,30 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
     font-variant-numeric: tabular-nums;
     min-height: 100vh;
     overscroll-behavior: none;
   }
 
-  :focus-visible {
-    outline-style: solid;
+  :focus-visible:not(:is(:open)) {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
   }
 
   p {
     line-height: var(--leading-relaxed);
   }
-}
 
-nav {
-  a {
+  /* Plain text links. Primitives rendered as <a> (Button, Item) carry a data-slot and opt out. */
+  a:not([data-slot]) {
     color: var(--info);
     text-underline-offset: 4px;
   }
 
-  a:hover {
+  a:not([data-slot]):hover {
     text-decoration-line: underline;
   }
 }

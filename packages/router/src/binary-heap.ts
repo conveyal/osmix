@@ -12,6 +12,7 @@
  * Operations:
  * - `push(item, priority)`: O(log n) - adds or updates item priority.
  * - `pop()`: O(log n) - removes and returns minimum priority item.
+ * - `peekPriority()`: O(1) - priority of the minimum item.
  * - `has(item)`: O(1) - checks if item is in heap.
  */
 export class BinaryHeap {
@@ -63,6 +64,13 @@ export class BinaryHeap {
     }
 
     return min;
+  }
+
+  /**
+   * Priority of the minimum item, or `Infinity` when the heap is empty.
+   */
+  peekPriority(): number {
+    return this.priorities[0] ?? Number.POSITIVE_INFINITY;
   }
 
   /**

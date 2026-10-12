@@ -36,7 +36,8 @@ export function createReadableEntityStreamFromOsm(
         controller.enqueue({
           ...osm.header,
           writingprogram: "@osmix/core",
-          osmosis_replication_timestamp: Date.now(),
+          // The PBF format records this in seconds since the epoch.
+          osmosis_replication_timestamp: Math.floor(Date.now() / 1000),
         });
         headerEnqueued = true;
       }

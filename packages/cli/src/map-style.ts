@@ -7,14 +7,14 @@ import {
 } from "@osmix/shortbread";
 import type { OsmTags, Rgba } from "osmix";
 
-export type PointSymbol = "diamond" | "dot" | "plus" | "ring" | "square";
+type PointSymbol = "diamond" | "dot" | "plus" | "ring" | "square";
 export type SemanticPointCategory = "civic" | "food" | "medical" | "recreation" | "transit";
 
 interface BaseFeatureStyle {
   order: number;
 }
 
-export interface FillFeatureStyle extends BaseFeatureStyle {
+interface FillFeatureStyle extends BaseFeatureStyle {
   kind: "fill";
   color: Rgba;
   outlineColor?: Rgba;

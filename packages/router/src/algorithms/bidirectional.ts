@@ -1,142 +1,135 @@
 /**
- * Bidirectional breadth-first search algorithm.
+ * Bidirectional Dijkstra.
  *
- * Searches from both start and end simultaneously, terminating when the
- * frontiers meet. Very fast for finding any path, but does not guarantee
- * the shortest path. Use Dijkstra or A* when optimality is required.
+ * Runs Dijkstra forward from the start over outgoing edges and backward from
+ * the end over incoming edges, and stops when neither search can improve the
+ * best meeting point. Returns an optimal path and respects one-way edges.
  *
  * @module
  */
 
-import type { PathSegment, RoutingAlgorithmFn } from "../types.ts";
+import { BinaryHeap } from "../binary-heap.ts";
+import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types.ts";
+
+/** How the backward search reached a node: the next node toward the end. */
+interface BackwardStep {
+  nextNodeIndex: number;
+  wayIndex: number;
+}
 
 /**
- * Bidirectional BFS - fast path finding from both ends.
- *
- * Uses breadth-first search from both start and end, terminating when
- * the frontiers meet. Very fast for finding any path, though not always
- * the optimal shortest path. Use Dijkstra or A* if optimality is required.
+ * Bidirectional Dijkstra. Requires `context.reverseGraph`, which `Router`
+ * supplies from `RoutingGraph.getIncomingEdges`.
  */
-export const bidirectional: RoutingAlgorithmFn = (graph, start, end, getWeight) => {
+export const bidirectional: RoutingAlgorithmFn = (
+  graph,
+  start,
+  end,
+  getWeight,
+  _getCoord,
+  _metric,
+  context,
+) => {
   if (start === end) return [{ nodeIndex: start, cost: 0 }];
+  const reverseGraph = context?.reverseGraph;
+  if (!reverseGraph) {
+    throw Error(
+      "Bidirectional routing needs context.reverseGraph (incoming edges). " +
+        "Router passes RoutingGraph.getIncomingEdges.",
+    );
+  }
 
-  // Forward search state
-  const fDist = new Map<number, number>();
+  const fDist = new Map<number, number>([[start, 0]]);
+  const bDist = new Map<number, number>([[end, 0]]);
   const fPrev = new Map<number, PathSegment>();
-  const fQueue: number[] = [start];
+  const bNext = new Map<number, BackwardStep>();
+  const fHeap = new BinaryHeap();
+  const bHeap = new BinaryHeap();
+  const fClosed = new Set<number>();
+  const bClosed = new Set<number>();
+  fHeap.push(start, 0);
+  bHeap.push(end, 0);
 
-  // Backward search state
-  const bDist = new Map<number, number>();
-  const bPrev = new Map<number, PathSegment>();
-  const bQueue: number[] = [end];
+  let best = Number.POSITIVE_INFINITY;
+  let meet = -1;
 
-  fDist.set(start, 0);
-  bDist.set(end, 0);
-
-  let meetNode: number | null = null;
-
-  while (fQueue.length > 0 && bQueue.length > 0) {
-    // Expand forward
-    if (fQueue.length > 0) {
-      const current = fQueue.shift()!;
-      const currentD = fDist.get(current)!;
-
-      // Check if backward search reached this node
-      if (bDist.has(current)) {
-        meetNode = current;
-        break;
+  const relax = (
+    current: number,
+    edges: GraphEdge[],
+    dist: Map<number, number>,
+    otherDist: Map<number, number>,
+    closed: Set<number>,
+    heap: BinaryHeap,
+    record: (neighbor: number, edge: GraphEdge, cost: number) => void,
+  ) => {
+    const currentD = dist.get(current)!;
+    for (const edge of edges) {
+      const neighbor = edge.targetNodeIndex;
+      if (closed.has(neighbor)) continue;
+      const cost = currentD + getWeight(edge);
+      const existing = dist.get(neighbor);
+      if (existing !== undefined && cost >= existing) continue;
+      dist.set(neighbor, cost);
+      record(neighbor, edge, cost);
+      heap.push(neighbor, cost);
+      const other = otherDist.get(neighbor);
+      if (other !== undefined && cost + other < best) {
+        best = cost + other;
+        meet = neighbor;
       }
+    }
+  };
 
-      for (const edge of graph(current)) {
-        const neighbor = edge.targetNodeIndex;
-        if (fDist.has(neighbor)) continue;
+  while (fHeap.size > 0 && bHeap.size > 0) {
+    // Stop once no unsettled node can lie on a path shorter than `best`.
+    if (fHeap.peekPriority() + bHeap.peekPriority() >= best) break;
 
-        const newD = currentD + getWeight(edge);
-        fDist.set(neighbor, newD);
+    if (fHeap.peekPriority() <= bHeap.peekPriority()) {
+      const current = fHeap.pop()!;
+      if (fClosed.has(current)) continue;
+      fClosed.add(current);
+      relax(current, graph(current), fDist, bDist, fClosed, fHeap, (neighbor, edge, cost) => {
         fPrev.set(neighbor, {
           nodeIndex: neighbor,
           wayIndex: edge.wayIndex,
           previousNodeIndex: current,
-          cost: newD,
+          cost,
         });
-        fQueue.push(neighbor);
-
-        if (bDist.has(neighbor)) {
-          meetNode = neighbor;
-          break;
-        }
-      }
-
-      if (meetNode !== null) break;
-    }
-
-    // Expand backward
-    if (bQueue.length > 0) {
-      const current = bQueue.shift()!;
-      const currentD = bDist.get(current)!;
-
-      // Check if forward search reached this node
-      if (fDist.has(current)) {
-        meetNode = current;
-        break;
-      }
-
-      for (const edge of graph(current)) {
-        const neighbor = edge.targetNodeIndex;
-        if (bDist.has(neighbor)) continue;
-
-        const newD = currentD + getWeight(edge);
-        bDist.set(neighbor, newD);
-        bPrev.set(neighbor, {
-          nodeIndex: neighbor,
-          wayIndex: edge.wayIndex,
-          previousNodeIndex: current,
-          cost: newD,
-        });
-        bQueue.push(neighbor);
-
-        if (fDist.has(neighbor)) {
-          meetNode = neighbor;
-          break;
-        }
-      }
-
-      if (meetNode !== null) break;
-    }
-  }
-
-  if (meetNode === null) return null;
-
-  // Build forward path: start -> meet
-  const forward: PathSegment[] = [];
-  let curr: number | undefined = meetNode;
-  while (curr !== undefined && curr !== start) {
-    const seg = fPrev.get(curr);
-    if (!seg) break;
-    forward.unshift(seg);
-    curr = seg.previousNodeIndex;
-  }
-  forward.unshift({ nodeIndex: start, cost: 0 });
-
-  // Build backward path: meet -> end (reverse direction)
-  // bDist represents distance FROM end TO node, so it decreases as we approach end.
-  // Correct cost = forward cost to meet + (backward dist at meet - backward dist at curr)
-  const meetForwardCost = fDist.get(meetNode)!;
-  const meetBackwardCost = bDist.get(meetNode)!;
-  curr = meetNode;
-  while (curr !== undefined && curr !== end) {
-    const seg = bPrev.get(curr);
-    if (!seg) break;
-    curr = seg.previousNodeIndex;
-    if (curr !== undefined) {
-      forward.push({
-        nodeIndex: curr,
-        wayIndex: seg.wayIndex,
-        previousNodeIndex: seg.nodeIndex,
-        cost: meetForwardCost + meetBackwardCost - (bDist.get(curr) ?? 0),
+      });
+    } else {
+      const current = bHeap.pop()!;
+      if (bClosed.has(current)) continue;
+      bClosed.add(current);
+      relax(current, reverseGraph(current), bDist, fDist, bClosed, bHeap, (neighbor, edge) => {
+        bNext.set(neighbor, { nextNodeIndex: current, wayIndex: edge.wayIndex });
       });
     }
   }
 
-  return forward;
+  if (meet === -1) return null;
+
+  // Forward half: start → meet.
+  const path: PathSegment[] = [];
+  let node = meet;
+  while (node !== start) {
+    const segment = fPrev.get(node)!;
+    path.unshift(segment);
+    node = segment.previousNodeIndex!;
+  }
+  path.unshift({ nodeIndex: start, cost: 0 });
+
+  // Backward half: meet → end, with costs measured from the start.
+  node = meet;
+  while (node !== end) {
+    const step = bNext.get(node)!;
+    path.push({
+      nodeIndex: step.nextNodeIndex,
+      wayIndex: step.wayIndex,
+      previousNodeIndex: node,
+      cost: best - bDist.get(step.nextNodeIndex)!,
+    });
+    node = step.nextNodeIndex;
+  }
+
+  return path;
 };

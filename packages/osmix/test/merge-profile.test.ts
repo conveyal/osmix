@@ -2,11 +2,7 @@ import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import { describe, expect, it } from "vitest";
 
 import { fromPbf, merge, Osm, toPbfBuffer } from "../src/index.ts";
-import {
-  canonicalOsmSha256,
-  profileMerge,
-  profileWorkerConflation,
-} from "./merge-profile-harness.ts";
+import { canonicalOsmSha256, profileMerge } from "./merge-profile-harness.ts";
 import {
   createMonacoRoutingPatch,
   createSyntheticConflationRoutingInputs,
@@ -15,12 +11,16 @@ import {
   roundTripRoutingOsm,
 } from "./synthetic-routing-fixture.ts";
 
-const ALL_MERGE_STEPS = {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-} as const;
+const PLAN_STAGES = [
+  "plan-direct",
+  "plan-identity",
+  "plan-matching",
+  "plan-crossings",
+  "plan-check",
+  "apply-plan",
+  "fingerprint-canonical-entities",
+  "fingerprint-pbf-output",
+];
 
 function complete(osm: Osm): Osm {
   osm.buildIndexes();
@@ -53,96 +53,30 @@ describe("merge performance harness", () => {
       roundTripRoutingOsm(createSyntheticRoutingBase(), "profile-synthetic-base"),
       roundTripRoutingOsm(createSyntheticRoutingPatch(), "profile-synthetic-patch"),
     ]);
-    const report = await profileMerge(base, patch, ALL_MERGE_STEPS);
-    const publicResult = await merge(base, patch, ALL_MERGE_STEPS, () => undefined);
+    const report = await profileMerge(base, patch, {});
+    const publicResult = await merge(base, patch, {}, () => undefined);
 
-    expect(report.stages.map(({ name }) => name)).toEqual([
-      "prepare-direct-exact-changeset",
-      "generate-direct-changes",
-      "reconcile-exact-nodes",
-      "reconcile-exact-ways",
-      "apply-direct-exact-changes",
-      "prepare-intersection-changeset",
-      "create-safe-intersections",
-      "apply-intersection-changes",
-      "fingerprint-canonical-entities",
-      "fingerprint-pbf-output",
-    ]);
+    expect(report.stages.map(({ name }) => name)).toEqual(PLAN_STAGES);
     expect(report.output).toEqual({ nodes: 33, ways: 14, relations: 1 });
     expect(report.fingerprints.contentHash).toBe(publicResult.contentHash());
     expect(report.fingerprints.canonicalSha256).toBe(canonicalOsmSha256(publicResult));
-    expect(
-      report.stages.find(({ name }) => name === "reconcile-exact-nodes")?.operations,
-    ).toMatchObject({ deduplicatedNodes: 1, deduplicatedNodesReplaced: 2 });
-    expect(
-      report.stages.find(({ name }) => name === "reconcile-exact-ways")?.operations,
-    ).toMatchObject({ waysChecked: 7, waysReconciled: 0 });
-    expect(
-      report.stages.find(({ name }) => name === "create-safe-intersections")?.operations,
-    ).toMatchObject({
-      waysChecked: 7,
+    expect(report.stages.find(({ name }) => name === "plan-identity")?.operations).toMatchObject({
+      deduplicatedNodes: 1,
+      deduplicatedNodesReplaced: 2,
+      deduplicatedWays: 0,
+    });
+    expect(report.stages.find(({ name }) => name === "plan-crossings")?.operations).toMatchObject({
       intersectionPointsFound: 3,
       intersectionNodesCreated: 3,
+      intersectionNodesRemoved: 0,
     });
   });
 
-  it("profiles worker conflation generation with routing safety diagnostics", async () => {
-    const { base, patch } = createSyntheticConflationRoutingInputs();
-    const report = await profileWorkerConflation(base, patch, {
-      directMerge: true,
-      deduplicateNodes: true,
-      deduplicateWays: true,
-      createIntersections: false,
-      conflation: {
-        propertyKeys: ["name"],
-        attachNetwork: true,
-        maxDistanceMeters: 1,
-        automatic: "high-confidence",
-      },
-    });
-
-    expect(report.stages.map(({ name }) => name)).toEqual([
-      "register-worker-inputs",
-      "worker-discover-conflation-candidates",
-      "worker-generate-conflation-changeset",
-      "worker-apply-conflation-result",
-      "fingerprint-canonical-entities",
-      "fingerprint-pbf-output",
-    ]);
-    expect(report.output).toEqual({ nodes: 82, ways: 80, relations: 0 });
-    expect(
-      report.stages.find(({ name }) => name === "worker-discover-conflation-candidates")
-        ?.operations,
-    ).toMatchObject({
-      candidateTotal: 81,
-      candidateAutomatic: 1,
-      candidateReview: 0,
-      candidateBlocked: 0,
-      candidateUnmatched: 80,
-    });
-    const generation = report.stages.find(
-      ({ name }) => name === "worker-generate-conflation-changeset",
-    )?.operations;
-    expect(generation).toMatchObject({
-      totalChanges: 82,
-      nodeChanges: 42,
-      wayChanges: 40,
-      carDeltaRoutableNodes: 0,
-      carDeltaEdges: 0,
-      carDeltaComponents: 0,
-      walkDeltaRoutableNodes: -1,
-      walkDeltaComponents: -1,
-    });
-  });
-
-  it("profiles high-level conflation with the production discovery reuse path", async () => {
+  it("profiles a plan with matching as the public merge runs it", async () => {
     const { base, patch } = createSyntheticConflationRoutingInputs();
     const options = {
-      directMerge: true,
-      deduplicateNodes: true,
-      deduplicateWays: true,
       createIntersections: false,
-      conflation: {
+      matching: {
         propertyKeys: ["name"],
         attachNetwork: true,
         maxDistanceMeters: 1,
@@ -152,18 +86,7 @@ describe("merge performance harness", () => {
     const report = await profileMerge(base, patch, options);
     const publicResult = await merge(base, patch, options, () => undefined);
 
-    expect(report.stages.map(({ name }) => name)).toEqual([
-      "prepare-direct-exact-changeset",
-      "generate-direct-changes",
-      "reconcile-exact-nodes",
-      "reconcile-exact-ways",
-      "apply-direct-exact-changes",
-      "discover-conflation-candidates",
-      "generate-conflation-changes",
-      "apply-conflation-changes",
-      "fingerprint-canonical-entities",
-      "fingerprint-pbf-output",
-    ]);
+    expect(report.stages.map(({ name }) => name)).toEqual(PLAN_STAGES);
     expect(report.fingerprints.contentHash).toBe(publicResult.contentHash());
     expect(report.fingerprints.canonicalSha256).toBe(canonicalOsmSha256(publicResult));
   });
@@ -174,25 +97,24 @@ describe("merge performance harness", () => {
     const patch = await fromPbf(await toPbfBuffer(createMonacoRoutingPatch(base)), {
       id: "profile-monaco-patch",
     });
-    const report = await profileMerge(base, patch, ALL_MERGE_STEPS);
+    const report = await profileMerge(base, patch, {});
 
     expect(report.inputs).toEqual({
       base: { nodes: 14_286, ways: 3_346, relations: 46 },
       patch: { nodes: 2, ways: 1, relations: 0 },
     });
     expect(report.output).toEqual({ nodes: 14_287, ways: 3_347, relations: 46 });
-    expect(
-      report.stages.find(({ name }) => name === "reconcile-exact-nodes")?.operations,
-    ).toMatchObject({ deduplicatedNodes: 1, deduplicatedNodesReplaced: 1 });
-    expect(
-      report.stages.find(({ name }) => name === "reconcile-exact-ways")?.operations,
-    ).toMatchObject({ waysChecked: 1, waysReconciled: 0 });
-    expect(
-      report.stages.find(({ name }) => name === "create-safe-intersections")?.operations,
-    ).toMatchObject({ waysChecked: 1 });
+    expect(report.stages.find(({ name }) => name === "plan-identity")?.operations).toMatchObject({
+      deduplicatedNodes: 1,
+      deduplicatedNodesReplaced: 1,
+      deduplicatedWays: 0,
+    });
+    // One build for the whole merge.
+    expect(report.stages.filter(({ name }) => name.startsWith("apply"))).toHaveLength(1);
+    // The patch way extends from a base node: a junction, so that node gains no crossing tag.
     expect(report.fingerprints).toMatchObject({
-      contentHash: "c941a5b8",
-      canonicalSha256: "4f47037cf117c361dfc36113a7734eebd37b0f4a9e4d84861dc0ca5e3527ea5d",
+      contentHash: "762396c7",
+      canonicalSha256: "07e51056eb80db03ec2786cc2d3c996453a9c0db06d290d31539e0693c5b2cb0",
     });
     // The compressed byte stream can vary with Node's zlib version. Reports keep
     // that useful same-runtime fingerprint, while CI locks semantic output above.

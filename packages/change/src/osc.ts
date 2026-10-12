@@ -12,7 +12,7 @@
 
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 
-import type { OsmChangeset } from "./changeset.ts";
+import type { OsmChangeRecords } from "./types.ts";
 import { escapeXmlAttribute, osmTagsToOscTags } from "./utils.ts";
 
 /**
@@ -74,7 +74,7 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  * Set `augmented: true` to include both old and new versions of elements wrapped
  * in `<old>` and `<new>` elements, following the Overpass API Augmented Diffs format.
  *
- * @param changeset - The changeset to serialize.
+ * @param changeset - The changes to serialize: an `OsmChangeset` or any change records.
  * @param options - Options for OSC generation.
  * @returns XML string in OSC format.
  *
@@ -89,14 +89,15 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  * await Bun.write('changes.osc', osc)
  * ```
  */
-export function generateOscChanges(changeset: OsmChangeset, options: Partial<OscOptions> = {}) {
+export function generateOscChanges(changeset: OsmChangeRecords, options: Partial<OscOptions> = {}) {
   const { augmented } = { ...DEFAULT_OSC_OPTIONS, ...options };
 
   let create = "";
   let modify = "";
   let del = "";
 
-  for (const node of Object.values(changeset.nodeChanges)) {
+  for (const node of changeset.nodeChanges.values()) {
+    if (!node) continue;
     if (node.changeType === "create") {
       create += nodeToXml(node.entity);
     } else if (node.changeType === "modify") {
@@ -114,7 +115,8 @@ export function generateOscChanges(changeset: OsmChangeset, options: Partial<Osc
     }
   }
 
-  for (const way of Object.values(changeset.wayChanges)) {
+  for (const way of changeset.wayChanges.values()) {
+    if (!way) continue;
     if (way.changeType === "create") {
       create += wayToXml(way.entity);
     } else if (way.changeType === "modify") {
@@ -132,7 +134,8 @@ export function generateOscChanges(changeset: OsmChangeset, options: Partial<Osc
     }
   }
 
-  for (const relation of Object.values(changeset.relationChanges)) {
+  for (const relation of changeset.relationChanges.values()) {
+    if (!relation) continue;
     if (relation.changeType === "create") {
       create += relationToXml(relation.entity);
     } else if (relation.changeType === "modify") {

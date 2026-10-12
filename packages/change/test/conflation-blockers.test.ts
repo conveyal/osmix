@@ -2,18 +2,14 @@ import { Osm } from "@osmix/core";
 import type { OsmTags } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
+import { summarizeConflationCandidates } from "../src/conflation.ts";
 import {
-  applyChangesetToOsm,
-  buildConflationBulkDecisionResult,
-  conflationEffectiveStatus,
   discoverConflationCandidates,
-  filterConflationCandidates,
-  generateConflationChangeset,
   merge,
   type OsmConflationDecision,
   type OsmConflationOptions,
-  summarizeConflationCandidates,
 } from "../src/index.ts";
+import { findProposal, planAndApply, withMatchingDecisions } from "./helpers/plan.ts";
 
 type RelationKind = "none" | "route" | "restriction";
 type ConflictKind = "grade" | "access" | "protected" | "geometry" | "none";
@@ -147,49 +143,79 @@ describe("hard conflation blockers survive combined review reasons", () => {
         reasons: expect.arrayContaining([reason, "relation-member"]),
       },
     });
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [], {
-      action: "transfer-properties",
-      filter: { entityType: "way" },
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
+    // Accepting the blocked copy leaves it blocked.
+    const { plan, osm: result } = planAndApply(base, patch, {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: options,
+      decisions: [{ proposalId: "copy:w20>w10", action: "accept" }],
     });
-    expect(bulk.decisions).toEqual([]);
-    expect(bulk.preview).toMatchObject({
-      filteredCandidates: 1,
-      eligibleCandidates: 0,
-      skippedCandidates: 1,
-      changedCandidates: 0,
+    expect(findProposal(plan, "copy:w20>w10")).toMatchObject({
+      status: "blocked",
+      effect: "blocked",
     });
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
+    expect(entities(result)).toEqual(entities(baseline));
+  });
+
+  it("makes explicit acceptance ineffective in the plan and the merge", async () => {
+    const { base, patch, options } = createWayFixture("grade", "source");
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
+    const planned = planAndApply(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
+    );
+    expect(findProposal(planned.plan, "copy:w20>w10").effect).toBe("blocked");
+    expect(entities(planned.osm)).toEqual(entities(baseline));
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: bulk.decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
       () => {},
     );
     expect(entities(result)).toEqual(entities(baseline));
   });
 
-  it("makes explicit acceptance ineffective in generation and the public merge pipeline", async () => {
-    const { base, patch, options } = createWayFixture("grade", "source");
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
-    const conflation = { ...options, decisions: [acceptWay] };
-    const changeset = generateConflationChangeset(base, patch, { directMerge: true, conflation });
-    expect(entities(applyChangesetToOsm(changeset))).toEqual(entities(baseline));
-    const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
-    expect(entities(result)).toEqual(entities(baseline));
-  });
-
-  it("keeps blocked acceptance consistent in effective status, summary, and filtering", () => {
+  it("keeps blocked acceptance consistent in the summary and the plan", () => {
     const { base, patch, options } = createWayFixture("grade", "source", "restriction");
     const { candidates } = discoverConflationCandidates(base, patch, options);
-    expect(conflationEffectiveStatus(candidates[0]!, [acceptWay])).toBe("blocked");
     expect(summarizeConflationCandidates(candidates, [acceptWay])).toMatchObject({
       accepted: 0,
       blocked: 1,
     });
-    expect(filterConflationCandidates(candidates, { status: "blocked" }, [acceptWay])).toEqual(
-      candidates,
+    const { plan } = planAndApply(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
     );
-    expect(filterConflationCandidates(candidates, { status: "accepted" }, [acceptWay])).toEqual([]);
+    expect(findProposal(plan, "copy:w20>w10").effect).toBe("blocked");
+    expect(plan.summary.features["needs-decision"]).toBe(0);
   });
 
   it("adds ambiguity evidence without relaxing blocked transfers", () => {
@@ -231,7 +257,12 @@ describe("hard conflation blockers survive combined review reasons", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [acceptWay] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
       () => {},
     );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Imported");
@@ -239,22 +270,20 @@ describe("hard conflation blockers survive combined review reasons", () => {
     expect([...result.relations]).toEqual([...patch.relations]);
   });
 
-  it("keeps safe property copying usable when relation and access context block attachment", async () => {
+  it("keeps safe property copying usable when relation and copy-of-path context block attachment", async () => {
     const base = new Osm({ id: "base" });
     base.nodes.addNode({ id: 1, lon: 0, lat: 0, tags: { name: "Base" } });
     base.nodes.addNode({ id: 2, lon: -0.001, lat: 0 });
-    base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
+    base.nodes.addNode({ id: 3, lon: 0.001, lat: 0 });
+    base.ways.addWay({ id: 10, refs: [2, 1, 3], tags: { highway: "footway" } });
     base.buildIndexes();
     base.buildSpatialIndexes();
+    // Imported way 20 runs 0.4 m beside base way 10: a copy of it, so its point is no junction.
     const patch = new Osm({ id: "patch" });
-    patch.nodes.addNode({
-      id: 101,
-      lon: 0.000005,
-      lat: 0,
-      tags: { name: "Imported", access: "private" },
-    });
-    patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
-    patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+    patch.nodes.addNode({ id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported" } });
+    patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0.000004 });
+    patch.nodes.addNode({ id: 103, lon: -0.001, lat: 0.000004 });
+    patch.ways.addWay({ id: 20, refs: [103, 101, 102], tags: { highway: "footway" } });
     patch.relations.addRelation({
       id: 200,
       tags: { type: "route", route: "foot" },
@@ -270,7 +299,7 @@ describe("hard conflation blockers survive combined review reasons", () => {
       propertyTransfer: { status: "automatic" },
       networkAttachment: {
         status: "blocked",
-        reasons: expect.arrayContaining(["routing-family-conflict", "relation-member"]),
+        reasons: expect.arrayContaining(["traces-base-way", "relation-member"]),
       },
     });
     const blockedAttachment: OsmConflationDecision = {
@@ -279,38 +308,48 @@ describe("hard conflation blockers survive combined review reasons", () => {
       transferProperties: false,
       attachNetwork: true,
     };
-    expect(conflationEffectiveStatus(candidate!, [blockedAttachment])).toBe("blocked");
     expect(summarizeConflationCandidates(discovery.candidates, [blockedAttachment])).toMatchObject({
       accepted: 0,
       blocked: 1,
     });
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     const blockedResult = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [blockedAttachment] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [blockedAttachment],
+      ),
       () => {},
     );
     expect(entities(blockedResult)).toEqual(entities(baseline));
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [blockedAttachment], {
-      action: "transfer-properties",
-      filter: { entityType: "node" },
-    });
-    expect(bulk.decisions).toContainEqual({
+    const copyOnly: OsmConflationDecision = {
       candidateId: "node:101->1",
       action: "accept",
       transferProperties: true,
       attachNetwork: false,
-    });
+    };
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: bulk.decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [copyOnly],
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported" });
     expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
-    expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
+    expect(result.ways.getById(20)?.refs).toEqual([103, 101, 102]);
     expect([...result.relations]).toEqual([...patch.relations]);
   });
 });

@@ -10,6 +10,7 @@
 import type { OsmPbfStringTable } from "@osmix/pbf";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
 
+import { MAX_STRING_BYTES, MAX_UINT32_OFFSET, assertCapacity } from "./limits.ts";
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
 
 /**
@@ -27,7 +28,8 @@ export interface StringTableTransferables<T extends BufferType = BufferType> {
 /**
  * Append-only deduplicated string table.
  *
- * Limits: Max string length 65,535 bytes.
+ * Limits: a string holds at most `MAX_STRING_BYTES` (65,535) UTF-8 bytes, and the table
+ * holds at most `MAX_UINT32_OFFSET` bytes in total. Larger input throws `OsmCapacityError`.
  * Rebuilds reverse index lazily after transfer.
  */
 export default class StringTable {
@@ -83,6 +85,18 @@ export default class StringTable {
     if (existingIndex !== undefined) return existingIndex;
     const startIndex = this.start.length;
     const encoded = this.enc.encode(str);
+    assertCapacity(
+      "string-bytes",
+      encoded.length,
+      MAX_STRING_BYTES,
+      () => `String "${str.slice(0, 40)}…"`,
+    );
+    assertCapacity(
+      "total-string-bytes",
+      this.bytes.length + encoded.length,
+      MAX_UINT32_OFFSET,
+      () => "The string table",
+    );
     this.start.push(this.bytes.length);
     this.bytes.pushMany(encoded);
     this.count.push(encoded.length);

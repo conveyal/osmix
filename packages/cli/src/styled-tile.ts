@@ -43,7 +43,7 @@ export interface StyledTileNodeIndexProvider {
   findIndexesWithinBbox(bbox: GeoBbox2D): Iterable<number>;
 }
 
-export interface StyledTileSpatialIndexProvider {
+interface StyledTileSpatialIndexProvider {
   intersects(bbox: GeoBbox2D): Iterable<number>;
 }
 

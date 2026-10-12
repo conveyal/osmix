@@ -15,7 +15,8 @@ export interface OsmReader {
   readonly nodes: Nodes;
   readonly ways: Ways;
   readonly relations: Relations;
-  bbox(): GeoBbox2D;
+  /** Bounding box of all nodes, or `null` when the dataset has no nodes. */
+  bbox(): GeoBbox2D | null;
 }
 
 /**

@@ -178,11 +178,11 @@ describe("applyChangesetToOsm", () => {
     const base = createBaseOsm();
     const changeset = new OsmChangeset(base);
     const way = { id: 10, refs: [1, 2], tags: { highway: "tertiary" } };
-    changeset.wayChanges[10] = {
+    changeset.wayChanges.set(10, {
       changeType: "modify",
       entity: way,
       osmId: base.id,
-    };
+    });
     const before = JSON.stringify(way);
 
     applyChangesetToOsm(changeset);
@@ -193,11 +193,11 @@ describe("applyChangesetToOsm", () => {
   it("preserves the invalid-stage error for a change whose ID is absent from the base", () => {
     const base = createBaseOsm();
     const changeset = new OsmChangeset(base);
-    changeset.nodeChanges[999] = {
+    changeset.nodeChanges.set(999, {
       changeType: "modify",
       entity: { id: 999, lon: -120, lat: 46 },
       osmId: base.id,
-    };
+    });
 
     expect(() => applyChangesetToOsm(changeset)).toThrow(
       "Changeset still contains node changes in incorrect stage.",

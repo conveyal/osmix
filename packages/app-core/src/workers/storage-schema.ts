@@ -1,4 +1,4 @@
-import { OSM_STORE } from "../constants.ts";
+import { MERGE_DECISIONS_STORE, OSM_STORE } from "../constants.ts";
 
 export interface OsmSchemaUpgradeDatabase {
   createObjectStore(
@@ -15,14 +15,15 @@ function createOsmStore(db: OsmSchemaUpgradeDatabase): void {
   store.createIndex("by-last-accessed", "lastAccessedAt");
 }
 
-/** Recreate v1/v2 records because their transferable schema is incompatible with v3. */
+/**
+ * Recreate v1/v2 records because their transferable schema is incompatible with v3, and add
+ * the v4 store of saved merge review decisions.
+ */
 export function upgradeOsmStore(db: OsmSchemaUpgradeDatabase, oldVersion: number): void {
-  if (oldVersion === 0) {
-    createOsmStore(db);
-    return;
-  }
-  if (oldVersion < 3) {
+  if (oldVersion === 0) createOsmStore(db);
+  else if (oldVersion < 3) {
     db.deleteObjectStore(OSM_STORE);
     createOsmStore(db);
   }
+  if (oldVersion < 4) db.createObjectStore(MERGE_DECISIONS_STORE, { keyPath: "key" });
 }

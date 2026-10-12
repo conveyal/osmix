@@ -24,13 +24,13 @@ const DATASET_LOAD_TIMEOUT_MS = 10 * 60_000;
 
 export type TileRenderingMode = "workers";
 
-export interface BackingBufferDiagnostics {
+interface BackingBufferDiagnostics {
   allShared: boolean;
   referenceCount: number;
   uniqueCount: number;
 }
 
-export interface StyledTileRendererDiagnostics {
+interface StyledTileRendererDiagnostics {
   datasetBuffers: BackingBufferDiagnostics;
   restartCount: number;
   semanticIndexBuffers: BackingBufferDiagnostics;
@@ -157,7 +157,11 @@ class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
     this.shortbreadIndexBuffers = null;
 
     const info = await this.runWithWorker(
-      (worker) => worker.fromPbfFile(filePath, { id, buildSpatialIndexes: ["way", "relation"] }),
+      (worker) =>
+        worker.fromPbfFile(filePath, {
+          id,
+          spatialIndexes: { nodes: [], ways: true, relations: true },
+        }),
       {
         lane: "control",
         retry: "once",
@@ -287,7 +291,7 @@ class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
     this.progressReporter?.("Reloading the map after a worker restart…");
     this.datasetInfo = await worker.fromPbfFile(this.loadSource.filePath, {
       id: this.loadSource.id,
-      buildSpatialIndexes: ["way", "relation"],
+      spatialIndexes: { nodes: [], ways: true, relations: true },
     });
     await worker.cancelTilesBefore(this.generationGate.generation);
   }

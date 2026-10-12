@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": ["-lintignore"],
+  "workspaces": {
+    ".": {},
+    "apps/app": {
+      "entry": ["e2e/*.tsx"]
+    },
+    "apps/bench": {
+      "entry": ["scripts/*.ts"]
+    },
+    "packages/cli": {
+      "entry": ["scripts/*.ts", "src/cli.worker.ts"]
+    }
+  },
+  "ignore": ["apps/www/shiki.bundle.ts"],
+  "ignoreBinaries": ["expect", "script"]
+}

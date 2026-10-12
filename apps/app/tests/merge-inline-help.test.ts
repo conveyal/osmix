@@ -1,0 +1,129 @@
+import { ChangesSummary, ChangesFilters } from "@osmix/app-components";
+import { type OsmixAppRemote, remoteAtom } from "@osmix/app-core";
+import { changesetStatsAtom } from "@osmix/app-core";
+import { createStore, Provider } from "jotai";
+import type { MergePlanOverview } from "osmix";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+
+import { ConflationConfig } from "../src/components/conflation-config";
+import { ConflationRoutingDiagnostics } from "../src/components/conflation-routing-diagnostics";
+import { conflationFormAtom } from "../src/state/merge-plan";
+
+function renderWithStore(
+  element: React.ReactNode,
+  configure: (store: ReturnType<typeof createStore>) => void,
+) {
+  const store = createStore();
+  configure(store);
+  return renderToStaticMarkup(createElement(Provider, { store }, element));
+}
+
+describe("merge inline guidance", () => {
+  it("keeps labels and essential field descriptions visible with optional detailed help", () => {
+    const html = renderWithStore(createElement(ConflationConfig), (store) => {
+      store.set(conflationFormAtom, {
+        enabled: true,
+        transferProperties: true,
+        propertyKeys: "barrier, crossing, kerb, tactile_paving",
+        attachNetwork: true,
+        allowWayRemoval: false,
+        allowWayReplacement: false,
+        replacementToleranceMeters: 1,
+        traceLengthMeters: 10,
+        maxDistanceMeters: 1,
+      });
+    });
+
+    expect(html).toContain("OSM tag keys to copy");
+    expect(html).toContain("Candidate search radius (meters)");
+    expect(html).toContain('aria-label="About proximity matching"');
+    expect(html).toContain('aria-label="About property transfer"');
+    expect(html).toContain('aria-label="About transferable OSM tags"');
+    expect(html).toContain('aria-label="About network attachment"');
+    expect(html).toContain('aria-label="About candidate search radius"');
+    // Automation lives in the Plan section; matching settings have no automation control.
+    expect(html).not.toContain("Automatic decisions");
+    expect(html).not.toContain("Distance alone never guarantees acceptance");
+    expect(html).not.toContain("routing-affecting tags require review");
+    expect(html).toContain("Imported geometry stays intact");
+    expect(html).toContain("values leave base attributes unchanged");
+    expect(html).not.toContain("Missing imported values leave base tags unchanged");
+    expect(html).not.toContain("reconciliation apply their own rules separately");
+  });
+
+  it("defines the routing baseline, metrics, signed deltas, and mode invariants", () => {
+    const mode = {
+      before: { components: 2, edges: 2, nodes: 3, routableNodes: 3 },
+      after: { components: 1, edges: 4, nodes: 4, routableNodes: 4 },
+      delta: { components: -1, edges: 2, nodes: 1, routableNodes: 1 },
+    };
+    const diagnostics: MergePlanOverview["diagnostics"]["routing"] = { car: mode, walk: mode };
+    const html = renderToStaticMarkup(createElement(ConflationRoutingDiagnostics, { diagnostics }));
+
+    expect(html).toContain("is the base dataset");
+    expect(html).toContain("Routable nodes");
+    expect(html).toContain("Directed edges");
+    expect(html).toContain("Connected components");
+    expect(html).toContain("weakly connected groups");
+    expect(html).toContain("does not guarantee travel in both directions");
+    expect(html).toContain("Signed delta");
+    expect(html).toContain(">+2<");
+    expect(html).toContain("Automatic matching never changes CAR topology");
+    expect(html).toContain("do not prove that routing is correct");
+    expect(html).toContain("Planned result");
+
+    const applied = renderToStaticMarkup(
+      createElement(ConflationRoutingDiagnostics, { diagnostics, applied: true }),
+    );
+    expect(applied).toContain("is the merged result");
+    expect(applied).toContain("Merged result");
+    expect(applied).not.toContain("would apply");
+  });
+
+  it("shows reconciliation and intersection statistics with labeled filter groups", () => {
+    const html = renderWithStore(
+      createElement(
+        "div",
+        null,
+        createElement(ChangesSummary, { defaultOpen: true }),
+        createElement(ChangesFilters),
+      ),
+      (store) => {
+        store.set(remoteAtom, {
+          getChangesetPage: vi.fn(),
+          setChangesetFilters: vi.fn(),
+        } as unknown as OsmixAppRemote);
+        store.set(changesetStatsAtom, {
+          osmId: "merged",
+          totalChanges: 25,
+          nodeChanges: 10,
+          wayChanges: 9,
+          relationChanges: 6,
+          createChanges: 12,
+          modifyChanges: 8,
+          deleteChanges: 5,
+          deduplicatedNodes: 3,
+          deduplicatedNodesReplaced: 7,
+          deduplicatedWays: 2,
+          intersectionPointsFound: 5,
+          intersectionNodesCreated: 4,
+          intersectionNodesRemoved: 0,
+        });
+      },
+    );
+
+    expect(html).toContain("Reconciled nodes");
+    expect(html).toContain("Node references rewritten");
+    expect(html).toContain("Reconciled ways");
+    expect(html).toContain("Intersection nodes created");
+    expect(html).toContain("way node references and relation node members changed");
+    expect(html).toContain("one surviving entity");
+    expect(html).toContain("25 changes: 12 created, 8 modified, 5 deleted.");
+    expect(html.match(/<legend/g)).toHaveLength(2);
+    for (const label of ["Create", "Modify", "Delete", "Node", "Way", "Relation"]) {
+      expect(html).toContain(label);
+    }
+  });
+});

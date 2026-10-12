@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { fromPbf, merge, Osm, type OsmConflationDecision, toPbfBuffer } from "../src/index.ts";
+import {
+  fromPbf,
+  type MergePlanOptions,
+  merge,
+  Osm,
+  type OsmConflationDecision,
+  toPbfBuffer,
+} from "../src/index.ts";
 import { OsmixWorker } from "../src/worker.ts";
+import { withMatchingDecisions } from "./plan-decisions.ts";
 import { RoutingTestHarness } from "./routing-harness.ts";
 
-const ordinaryOptions = {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: false,
-};
+const ordinaryOptions: MergePlanOptions = { createIntersections: false };
 
 const propertyOptions = { propertyKeys: ["name"], attachNetwork: false };
 const trunkDecision: OsmConflationDecision = {
@@ -134,7 +137,7 @@ describe("property copying preserves imported branch routes", () => {
       patch,
       {
         ...ordinaryOptions,
-        conflation: { ...propertyOptions, propertyKeys: ["name", "description"] },
+        matching: { ...propertyOptions, propertyKeys: ["name", "description"] },
       },
       () => {},
     );
@@ -148,25 +151,25 @@ describe("property copying preserves imported branch routes", () => {
       expectBranchRoute(patch);
       const baseline = await merge(base, patch, ordinaryOptions, () => {});
       expectBranchRoute(baseline);
-      const result = await merge(
+      const options = withMatchingDecisions(
         base,
         patch,
         {
           ...ordinaryOptions,
-          conflation: {
+          matching: {
             ...propertyOptions,
             automatic: mode === "automatic" ? "high-confidence" : "none",
-            decisions: mode === "individual" ? [trunkDecision] : [],
           },
         },
-        () => {},
+        mode === "individual" ? [trunkDecision] : [],
       );
+      const result = await merge(base, patch, options, () => {});
       await expectPreservedResult(baseline, result);
     },
   );
 
   it.each(["automatic", "individual", "bulk"] as const)(
-    "preserves topology after worker generation and application with %s decisions",
+    "preserves topology after worker planning and application with %s decisions",
     async (mode) => {
       const { base, patch } = createBranchFixture();
       expectBranchRoute(patch);
@@ -175,21 +178,24 @@ describe("property copying preserves imported branch routes", () => {
       const worker = new TestWorker();
       worker.setOsm(base);
       worker.setOsm(patch);
-      worker.discoverConflation(base.id, patch.id, {
-        ...propertyOptions,
-        automatic: mode === "automatic" ? "high-confidence" : "none",
+      worker.planMerge(base.id, patch.id, {
+        ...ordinaryOptions,
+        matching: {
+          ...propertyOptions,
+          automatic: mode === "automatic" ? "high-confidence" : "none",
+        },
       });
+      const trunkCopy = { proposalId: "copy:w20>w10", action: "accept" as const };
       if (mode === "individual") {
-        worker.setConflationDecision(base.id, trunkDecision);
+        worker.setMergePlanDecisions(base.id, [trunkCopy]);
       } else if (mode === "bulk") {
-        const applied = worker.applyConflationBulkDecision(base.id, {
-          action: "transfer-properties",
-          filter: { entityType: "way" },
+        const applied = worker.applyMergePlanBulk(base.id, {
+          action: "accept",
+          filter: { kind: "copy-tags" },
         });
-        expect(applied.decisions).toContainEqual(trunkDecision);
+        expect(applied.overview.decisions).toContainEqual(trunkCopy);
       }
-      worker.generateConflationChangeset(base.id, ordinaryOptions);
-      worker.applyChangesAndReplace(base.id);
+      worker.applyMergePlan(base.id);
       await expectPreservedResult(baseline, worker.getOsm(base.id));
     },
   );

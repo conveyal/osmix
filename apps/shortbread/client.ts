@@ -9,6 +9,8 @@ import type { GeoBbox2D, LonLat } from "@osmix/types";
 import * as maplibregl from "maplibre-gl";
 import { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl";
 
+import "./maplibre-worker.ts";
+
 let map: maplibregl.Map | null = null;
 
 function createLog() {

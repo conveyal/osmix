@@ -9,21 +9,20 @@
 
 import { Osm } from "@osmix/core";
 
+import type { ChangeRecordTable } from "./change-records.ts";
 import type { OsmChangeset } from "./changeset.ts";
 import { reuseRoutingIntegrityAnalysis } from "./integrity.ts";
+import type { OsmChangeRecords } from "./types.ts";
 
-function hasOwnChanges(changes: Record<number, unknown>) {
-  for (const key in changes) {
-    if (Object.hasOwn(changes, key)) return true;
-  }
-  return false;
+function hasOwnChanges(changes: ChangeRecordTable) {
+  return !changes.values().next().done;
 }
 
-function isEmptyChangeset(changeset: OsmChangeset) {
+function isEmpty(changes: OsmChangeRecords) {
   return (
-    !hasOwnChanges(changeset.nodeChanges) &&
-    !hasOwnChanges(changeset.wayChanges) &&
-    !hasOwnChanges(changeset.relationChanges)
+    !hasOwnChanges(changes.nodeChanges) &&
+    !hasOwnChanges(changes.wayChanges) &&
+    !hasOwnChanges(changes.relationChanges)
   );
 }
 
@@ -45,15 +44,28 @@ function isEmptyChangeset(changeset: OsmChangeset) {
  *
  * @example
  * ```ts
- * const changeset = new OsmChangeset(baseOsm)
- * changeset.generateDirectChanges(patchOsm)
- * changeset.deduplicateNodes(patchOsm.nodes)
- * const newOsm = applyChangesetToOsm(changeset)
+ * const changeset = planWithinDatasetDeduplication(osm)
+ * const cleaned = applyChangesetToOsm(changeset)
  * ```
  */
 export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) {
-  const baseOsm = changeset.osm;
-  if (isEmptyChangeset(changeset)) {
+  const osm = materializeChanges(changeset.osm, changeset, newOsmId);
+  changeset.assertValidResult(osm);
+  return osm;
+}
+
+/**
+ * Build the dataset `changes` describe on top of `baseOsm`, with ID, tag and spatial indexes.
+ * The one full build of a merge. Does not validate the result.
+ *
+ * @throws If the records contain invalid change sequences (e.g., create for an existing entity).
+ */
+export function materializeChanges(
+  baseOsm: Osm,
+  changes: OsmChangeRecords,
+  newOsmId?: string,
+): Osm {
+  if (isEmpty(changes)) {
     // Keep the documented fresh-result behavior while reusing finalized,
     // immutable typed buffers and spatial indexes for a true no-op. This is
     // important for empty-patch identity merges on large base datasets.
@@ -65,7 +77,6 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
     // The wrapper above references the exact same finalized entity buffers.
     // Carry the source analysis forward so the next merge stage can reuse it.
     reuseRoutingIntegrityAnalysis(baseOsm, osm);
-    changeset.assertValidResult(osm);
     return osm;
   }
 
@@ -74,11 +85,11 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
     header: baseOsm.header,
   });
 
-  const { nodeChanges, wayChanges, relationChanges } = changeset;
+  const { nodeChanges, wayChanges, relationChanges } = changes;
 
   // Add nodes from base, modifying and deleting as needed
   for (const node of baseOsm.nodes) {
-    const change = nodeChanges[node.id];
+    const change = nodeChanges.get(node.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted nodes
       if (change.changeType === "create")
@@ -89,21 +100,19 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // All remaining node changes should be create
   // Add nodes from patch
-  for (const idText in nodeChanges) {
-    if (!Object.hasOwn(nodeChanges, idText)) continue;
-    const change = nodeChanges[Number(idText)]!;
+  for (const change of nodeChanges.values()) {
     if (change.changeType === "create") {
       osm.nodes.addNode(change.entity);
       continue;
     }
-    if (!baseOsm.nodes.ids.has(Number(idText))) {
+    if (!baseOsm.nodes.ids.has(change.entity.id)) {
       throw Error("Changeset still contains node changes in incorrect stage.");
     }
   }
 
   // Add ways from base, modifying and deleting as needed
   for (const way of baseOsm.ways) {
-    const change = wayChanges[way.id];
+    const change = wayChanges.get(way.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted ways
       if (change.changeType === "create") {
@@ -116,21 +125,19 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // All remaining way changes should be create
   // Add ways from patch
-  for (const idText in wayChanges) {
-    if (!Object.hasOwn(wayChanges, idText)) continue;
-    const change = wayChanges[Number(idText)]!;
+  for (const change of wayChanges.values()) {
     if (change.changeType === "create") {
       osm.ways.addWay(change.entity);
       continue;
     }
-    if (!baseOsm.ways.ids.has(Number(idText))) {
+    if (!baseOsm.ways.ids.has(change.entity.id)) {
       throw Error("Changeset still contains way changes in incorrect stage.");
     }
   }
 
   // Add relations from base, modifying and deleting as needed
   for (const relation of baseOsm.relations) {
-    const change = relationChanges[relation.id];
+    const change = relationChanges.get(relation.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted relations
       if (change.changeType === "create") {
@@ -141,14 +148,12 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
   }
 
   // Add relations from patch
-  for (const idText in relationChanges) {
-    if (!Object.hasOwn(relationChanges, idText)) continue;
-    const change = relationChanges[Number(idText)]!;
+  for (const change of relationChanges.values()) {
     if (change.changeType === "create") {
       osm.relations.addRelation(change.entity);
       continue;
     }
-    if (!baseOsm.relations.ids.has(Number(idText))) {
+    if (!baseOsm.relations.ids.has(change.entity.id)) {
       throw Error("Changeset still contains relation changes in incorrect stage.");
     }
   }
@@ -158,8 +163,6 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // Build spatial indexes
   osm.buildSpatialIndexes();
-
-  changeset.assertValidResult(osm);
 
   return osm;
 }

@@ -13,6 +13,7 @@
 
 import { BufferConstructor, type BufferType, type Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
+import { BitSet } from "@osmix/shared/bit-set";
 import type { LonLat } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
@@ -33,7 +34,8 @@ import { DEFAULT_SPEEDS, defaultHighwayFilter, getSpeedLimit } from "./utils.ts"
  * @example Build from OSM data
  * ```ts
  * const graph = new RoutingGraph(osm)
- * const route = router.route(graph, startNode, endNode)
+ * const router = new Router(osm, graph)
+ * const path = router.route(startNodeIndex, endNodeIndex)
  * ```
  *
  * @example Transfer between workers
@@ -58,8 +60,15 @@ export class RoutingGraph {
   private edgeWayIndexes: Uint32Array | null = null;
   private edgeDistances: Float32Array | null = null;
   private edgeTimes: Float32Array | null = null;
-  private routableBits: Uint8Array | null = null;
-  private intersectionBits: Uint8Array | null = null;
+  private routable: BitSet | null = null;
+  private intersections: BitSet | null = null;
+
+  // Incoming-edge CSR, built on first use by getIncomingEdges(). Per worker; not transferred.
+  private reverseOffsets: Uint32Array | null = null;
+  /** Forward edge index for each incoming edge, grouped by target node. */
+  private reverseEdges: Uint32Array | null = null;
+  private reverseSources: Uint32Array | null = null;
+  private cachedMaxSpeedMps: number | null = null;
 
   // Expose highway filter and default speeds
   readonly filter: HighwayFilter;
@@ -99,28 +108,88 @@ export class RoutingGraph {
     this.edgeWayIndexes = new Uint32Array(t.edgeWayIndexes);
     this.edgeDistances = new Float32Array(t.edgeDistances);
     this.edgeTimes = new Float32Array(t.edgeTimes);
-    this.routableBits = new Uint8Array(t.routableBits);
-    this.intersectionBits = new Uint8Array(t.intersectionBits);
+    this.routable = new BitSet(t.nodeCount, t.routableBits);
+    this.intersections = new BitSet(t.nodeCount, t.intersectionBits);
   }
 
   /**
-   * Build the graph from OSM data.
+   * Build the graph from OSM data in two passes over the routable ways, straight into typed
+   * arrays: the first counts each node's outgoing edges and sets the node flags, the second
+   * fills the CSR arrays. No per-edge objects or `Map`/`Set` (V8 caps those near 2^24 entries).
    */
   private buildFromOsm(osm: Osm, filter: HighwayFilter, defaultSpeeds: DefaultSpeeds) {
     this.nodeCount = osm.nodes.size;
-    const tempEdges = new Map<number, GraphEdge[]>();
-    const tempRoutable = new Set<number>();
-    const tempIntersections = new Set<number>();
+    const bitsetLength = BitSet.byteLength(this.nodeCount);
+    this.routable = new BitSet(this.nodeCount, new BufferConstructor(bitsetLength));
+    this.intersections = new BitSet(this.nodeCount, new BufferConstructor(bitsetLength));
+    const offsets = new Uint32Array(
+      new BufferConstructor((this.nodeCount + 1) * Uint32Array.BYTES_PER_ELEMENT),
+    );
+    this.edgeOffsets = offsets;
 
-    const addEdgeToNode = (from: number, edge: GraphEdge) => {
-      let nodeEdges = tempEdges.get(from);
-      if (!nodeEdges) {
-        nodeEdges = [];
-        tempEdges.set(from, nodeEdges);
-      }
-      nodeEdges.push(edge);
+    // Pass 1: count outgoing edges into offsets[from + 1], and mark routable nodes and
+    // intersections (a node seen a second time).
+    this.forEachSegment(osm, filter, defaultSpeeds, (from, to, direction) => {
+      if (direction !== "reverse") offsets[from + 1]!++;
+      if (direction !== "forward") offsets[to + 1]!++;
+      this.markRoutable(from);
+      this.markRoutable(to);
+    });
+    for (let n = 0; n < this.nodeCount; n++) offsets[n + 1]! += offsets[n]!;
+    this.edgeCount = offsets[this.nodeCount]!;
+
+    this.edgeTargets = new Uint32Array(
+      new BufferConstructor(this.edgeCount * Uint32Array.BYTES_PER_ELEMENT),
+    );
+    this.edgeWayIndexes = new Uint32Array(
+      new BufferConstructor(this.edgeCount * Uint32Array.BYTES_PER_ELEMENT),
+    );
+    this.edgeDistances = new Float32Array(
+      new BufferConstructor(this.edgeCount * Float32Array.BYTES_PER_ELEMENT),
+    );
+    this.edgeTimes = new Float32Array(
+      new BufferConstructor(this.edgeCount * Float32Array.BYTES_PER_ELEMENT),
+    );
+
+    // Pass 2: fill each node's edges in way order.
+    const cursor = offsets.slice(0, this.nodeCount);
+    const addEdge = (
+      from: number,
+      to: number,
+      wayIndex: number,
+      distance: number,
+      time: number,
+    ) => {
+      const edgeIndex = cursor[from]!++;
+      this.edgeTargets![edgeIndex] = to;
+      this.edgeWayIndexes![edgeIndex] = wayIndex;
+      this.edgeDistances![edgeIndex] = distance;
+      this.edgeTimes![edgeIndex] = time;
     };
+    this.forEachSegment(osm, filter, defaultSpeeds, (from, to, direction, wayIndex, speedMps) => {
+      const distance = haversineDistance(
+        osm.nodes.getNodeLonLat({ index: from }),
+        osm.nodes.getNodeLonLat({ index: to }),
+      );
+      const time = distance / speedMps;
+      if (direction !== "reverse") addEdge(from, to, wayIndex, distance, time);
+      if (direction !== "forward") addEdge(to, from, wayIndex, distance, time);
+    });
+  }
 
+  /** Visit each segment of each routable way, in way order, with its direction and speed. */
+  private forEachSegment(
+    osm: Osm,
+    filter: HighwayFilter,
+    defaultSpeeds: DefaultSpeeds,
+    visit: (
+      from: number,
+      to: number,
+      direction: "forward" | "reverse" | "both",
+      wayIndex: number,
+      speedMps: number,
+    ) => void,
+  ) {
     for (let wayIndex = 0; wayIndex < osm.ways.size; wayIndex++) {
       const tags = osm.ways.tags.getTags(wayIndex);
       if (!filter(tags)) continue;
@@ -128,7 +197,6 @@ export class RoutingGraph {
       const refs = osm.ways.getRefIds(wayIndex);
       if (refs.length < 2) continue;
 
-      // Create directed edges between consecutive nodes (respecting one-way direction).
       const normalizedDirection = normalizedWayDirection(tags);
       // Preserve the existing router approximation for unsupported dynamic values.
       // Matching does not use this fallback to establish direction equivalence.
@@ -138,106 +206,24 @@ export class RoutingGraph {
             ? "forward"
             : "both"
           : normalizedDirection;
-      const speedKph = getSpeedLimit(tags, defaultSpeeds);
-      const speedMps = (speedKph * 1_000) / 60 / 60;
-      const nodes = refs.map((ref) => osm.nodes.ids.getIndexFromId(ref));
+      const speedMps = (getSpeedLimit(tags, defaultSpeeds) * 1_000) / 60 / 60;
 
-      for (let i = 0; i < nodes.length - 1; i++) {
-        const nodeIndex = nodes[i]!;
-        const targetNodeIndex = nodes[i + 1]!;
-        const fromCoord = osm.nodes.getNodeLonLat({ index: nodeIndex });
-        const targetCoord = osm.nodes.getNodeLonLat({ index: targetNodeIndex });
-
-        const distanceM = haversineDistance(fromCoord, targetCoord);
-        const time = distanceM / speedMps;
-
-        if (direction !== "reverse") {
-          addEdgeToNode(nodeIndex, {
-            targetNodeIndex,
-            wayIndex,
-            distance: distanceM,
-            time,
-          });
-          this.edgeCount++;
-        }
-
-        if (direction !== "forward") {
-          addEdgeToNode(targetNodeIndex, {
-            targetNodeIndex: nodeIndex,
-            wayIndex,
-            distance: distanceM,
-            time,
-          });
-          this.edgeCount++;
-        }
-
-        // Track routable nodes and intersections (nodes appearing in multiple ways)
-        if (tempRoutable.has(nodeIndex)) {
-          tempIntersections.add(nodeIndex);
-        } else {
-          tempRoutable.add(nodeIndex);
-        }
-
-        if (tempRoutable!.has(targetNodeIndex)) {
-          tempIntersections.add(targetNodeIndex);
-        } else {
-          tempRoutable!.add(targetNodeIndex);
-        }
+      let from = osm.nodes.ids.getIndexFromId(refs[0]!);
+      for (let i = 1; i < refs.length; i++) {
+        const to = osm.nodes.ids.getIndexFromId(refs[i]!);
+        // A ref to a node outside the dataset (for example, cut off by an extract) has index -1.
+        // Skip the segments that touch it rather than store a wrapped Uint32 index.
+        if (from >= 0 && to >= 0) visit(from, to, direction, wayIndex, speedMps);
+        from = to;
       }
     }
+  }
 
-    // Convert to CSR format and free temporary structures
-
-    // Allocate CSR arrays
-    const offsetsBuffer = new BufferConstructor(
-      (this.nodeCount + 1) * Uint32Array.BYTES_PER_ELEMENT,
-    );
-    const targetsBuffer = new BufferConstructor(this.edgeCount * Uint32Array.BYTES_PER_ELEMENT);
-    const wayIndexesBuffer = new BufferConstructor(this.edgeCount * Uint32Array.BYTES_PER_ELEMENT);
-    const distancesBuffer = new BufferConstructor(this.edgeCount * Float32Array.BYTES_PER_ELEMENT);
-    const timesBuffer = new BufferConstructor(this.edgeCount * Float32Array.BYTES_PER_ELEMENT);
-
-    this.edgeOffsets = new Uint32Array(offsetsBuffer);
-    this.edgeTargets = new Uint32Array(targetsBuffer);
-    this.edgeWayIndexes = new Uint32Array(wayIndexesBuffer);
-    this.edgeDistances = new Float32Array(distancesBuffer);
-    this.edgeTimes = new Float32Array(timesBuffer);
-
-    // Build CSR format: iterate through all nodes in order
-    let edgeIndex = 0;
-    for (let nodeIndex = 0; nodeIndex < this.nodeCount; nodeIndex++) {
-      this.edgeOffsets[nodeIndex] = edgeIndex;
-      const edges = tempEdges.get(nodeIndex);
-      if (edges) {
-        for (const edge of edges) {
-          this.edgeTargets[edgeIndex] = edge.targetNodeIndex;
-          this.edgeWayIndexes[edgeIndex] = edge.wayIndex;
-          this.edgeDistances[edgeIndex] = edge.distance;
-          this.edgeTimes[edgeIndex] = edge.time;
-          edgeIndex++;
-        }
-      }
-    }
-    this.edgeOffsets[this.nodeCount] = edgeIndex;
-
-    // Build bitsets for routable and intersection flags
-    const bitsetLength = Math.ceil(this.nodeCount / 8);
-    const routableBuffer = new BufferConstructor(bitsetLength);
-    const intersectionBuffer = new BufferConstructor(bitsetLength);
-    this.routableBits = new Uint8Array(routableBuffer);
-    this.intersectionBits = new Uint8Array(intersectionBuffer);
-
-    for (const nodeIndex of tempRoutable) {
-      const byteIndex = nodeIndex >> 3;
-      const bitMask = 1 << (nodeIndex & 7);
-      this.routableBits[byteIndex]! |= bitMask;
-    }
-
-    for (const nodeIndex of tempIntersections) {
-      const byteIndex = nodeIndex >> 3;
-      const bitMask = 1 << (nodeIndex & 7);
-      this.intersectionBits[byteIndex]! |= bitMask;
-    }
+  /** Mark a node routable, or an intersection if it was already routable. */
+  private markRoutable(nodeIndex: number) {
+    // Segment endpoints are resolved node indexes, so they are in range.
+    if (this.routable!.hasUnchecked(nodeIndex)) this.intersections!.addUnchecked(nodeIndex);
+    else this.routable!.addUnchecked(nodeIndex);
   }
 
   /**
@@ -245,9 +231,7 @@ export class RoutingGraph {
    */
   isRoutable(nodeIndex: number): boolean {
     if (nodeIndex < 0 || nodeIndex >= this.nodeCount) return false;
-    const byteIndex = nodeIndex >> 3;
-    const bitMask = 1 << (nodeIndex & 7);
-    return (this.routableBits![byteIndex]! & bitMask) !== 0;
+    return this.routable!.hasUnchecked(nodeIndex);
   }
 
   /**
@@ -255,9 +239,7 @@ export class RoutingGraph {
    */
   isIntersection(nodeIndex: number): boolean {
     if (nodeIndex < 0 || nodeIndex >= this.nodeCount) return false;
-    const byteIndex = nodeIndex >> 3;
-    const bitMask = 1 << (nodeIndex & 7);
-    return (this.intersectionBits![byteIndex]! & bitMask) !== 0;
+    return this.intersections!.hasUnchecked(nodeIndex);
   }
 
   /**
@@ -285,6 +267,70 @@ export class RoutingGraph {
   }
 
   /**
+   * Get incoming edges of a node. In each returned edge, `targetNodeIndex` is the
+   * edge's source node. The reverse index (4 bytes per node plus 8 bytes per edge)
+   * is built on the first call.
+   */
+  getIncomingEdges(nodeIndex: number): GraphEdge[] {
+    if (nodeIndex < 0 || nodeIndex >= this.nodeCount || !this.edgeOffsets || !this.edgeTargets) {
+      return [];
+    }
+    if (!this.reverseOffsets) this.buildReverseIndex();
+    const start = this.reverseOffsets![nodeIndex]!;
+    const end = this.reverseOffsets![nodeIndex + 1]!;
+    const edges: GraphEdge[] = [];
+    for (let i = start; i < end; i++) {
+      const edgeIndex = this.reverseEdges![i]!;
+      edges.push({
+        targetNodeIndex: this.reverseSources![i]!,
+        wayIndex: this.edgeWayIndexes![edgeIndex]!,
+        distance: this.edgeDistances![edgeIndex]!,
+        time: this.edgeTimes![edgeIndex]!,
+      });
+    }
+    return edges;
+  }
+
+  private buildReverseIndex() {
+    const offsets = this.edgeOffsets!;
+    const targets = this.edgeTargets!;
+    const reverseOffsets = new Uint32Array(this.nodeCount + 1);
+    for (let i = 0; i < this.edgeCount; i++) reverseOffsets[targets[i]! + 1]!++;
+    for (let n = 0; n < this.nodeCount; n++) {
+      reverseOffsets[n + 1]! += reverseOffsets[n]!;
+    }
+    const cursor = reverseOffsets.slice(0, this.nodeCount);
+    const reverseEdges = new Uint32Array(this.edgeCount);
+    const reverseSources = new Uint32Array(this.edgeCount);
+    for (let source = 0; source < this.nodeCount; source++) {
+      for (let e = offsets[source]!; e < offsets[source + 1]!; e++) {
+        const slot = cursor[targets[e]!]!++;
+        reverseEdges[slot] = e;
+        reverseSources[slot] = source;
+      }
+    }
+    this.reverseOffsets = reverseOffsets;
+    this.reverseEdges = reverseEdges;
+    this.reverseSources = reverseSources;
+  }
+
+  /**
+   * Fastest edge speed in the graph, in meters per second. The A* time heuristic
+   * divides by this so that it never overestimates travel time.
+   */
+  get maxSpeedMps(): number {
+    if (this.cachedMaxSpeedMps !== null) return this.cachedMaxSpeedMps;
+    let max = 0;
+    for (let i = 0; i < this.edgeCount; i++) {
+      const time = this.edgeTimes![i]!;
+      if (time > 0) max = Math.max(max, this.edgeDistances![i]! / time);
+    }
+    // Float32 rounding can shave a little off the true speed; keep the bound safe.
+    this.cachedMaxSpeedMps = max > 0 ? max * (1 + 1e-6) : Number.POSITIVE_INFINITY;
+    return this.cachedMaxSpeedMps;
+  }
+
+  /**
    * Get transferable buffers for passing to another thread.
    */
   transferables(): RoutingGraphTransferables {
@@ -296,13 +342,14 @@ export class RoutingGraph {
       edgeWayIndexes: this.edgeWayIndexes!.buffer as BufferType,
       edgeDistances: this.edgeDistances!.buffer as BufferType,
       edgeTimes: this.edgeTimes!.buffer as BufferType,
-      routableBits: this.routableBits!.buffer as BufferType,
-      intersectionBits: this.intersectionBits!.buffer as BufferType,
+      routableBits: this.routable!.buffer as BufferType,
+      intersectionBits: this.intersections!.buffer as BufferType,
     };
   }
 
   /**
-   * Get the number of nodes in the graph.
+   * Number of node slots in the graph: every node in the source OSM data, not only
+   * routable ones. Use `isRoutable()` to test a node.
    */
   get size(): number {
     return this.nodeCount;
@@ -322,6 +369,9 @@ export class RoutingGraph {
    * graph (i.e., lie on a routable way). Returns the closest match with its
    * coordinates and distance.
    *
+   * Snaps to graph nodes only, not to points along edges. Requires the "all" node
+   * spatial index; throws `SpatialIndexNotBuiltError` without it.
+   *
    * @param osm - The OSM dataset.
    * @param point - The [lon, lat] coordinates to search from.
    * @param maxDistanceM - Maximum search radius in meters.
@@ -329,7 +379,7 @@ export class RoutingGraph {
    *
    * @example
    * ```ts
-   * const nearest = graph.findNearestNodeOnGraph(osm, [-73.989, 40.733], 0.5)
+   * const nearest = graph.findNearestRoutableNode(osm, [-73.989, 40.733], 500)
    * if (nearest) {
    *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}m`)
    * }

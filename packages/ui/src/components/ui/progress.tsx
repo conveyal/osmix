@@ -14,7 +14,7 @@ function Progress({ className, value, ...props }: React.ComponentProps<typeof Ba
       >
         <BaseProgress.Indicator
           className={cn(
-            "block h-full rounded-full bg-primary transition-[width]",
+            "block h-full rounded-full bg-brand transition-[width]",
             value == null && "w-1/3 animate-progress-indeterminate",
           )}
         />

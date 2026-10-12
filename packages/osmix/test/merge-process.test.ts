@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applyChangesetToOsm,
+  applyPlan,
   fromPbf,
-  generateChangeset,
-  generateConflationArtifacts,
   merge,
+  type MergePlanOptions,
   Osm,
-  type OsmConflationDecision,
+  type PlanDecision,
+  planMerge,
   type OsmNode,
   type OsmWay,
   toPbfBuffer,
@@ -66,78 +66,94 @@ describe("merge-process guide", () => {
     );
     const originalBase = entities(base);
     const originalPatch = entities(patch);
-    const direct = applyChangesetToOsm(generateChangeset(base, patch, { directMerge: true }));
+    const plan = (options: MergePlanOptions) => planMerge(base, patch, options, () => {});
+
+    // Direct changes only: every patch entity is added beside the base.
+    const direct = applyPlan(plan({ mergeIdenticalPoints: false, createIntersections: false })).osm;
     expect(entities(direct)).toEqual({
       nodes: [...originalBase.nodes, ...originalPatch.nodes],
       ways: [...originalBase.ways, ...originalPatch.ways],
       relations: [],
     });
 
-    const nodes = generateChangeset(base, patch, { directMerge: true, deduplicateNodes: true });
-    const nodeResult = applyChangesetToOsm(nodes);
-    expect([...nodeResult.nodes.sorted()].map((node) => node.id)).toEqual([1, 2, 201, 301, 302]);
-    expect(nodeResult.ways.getById(20)?.refs).toEqual([1, 2]);
+    // Identity: 101 and 102 sit on 1 and 2, so they merge, and way 20 becomes way 10.
+    const identityPlan = plan({ createIntersections: false });
+    expect(
+      [...identityPlan.proposals.values()]
+        .filter((proposal) => proposal.kind === "exact-merge" || proposal.kind === "way-reconcile")
+        .map(({ id, effect }) => [id, effect]),
+    ).toEqual([
+      ["exact:n101>n1", "applied"],
+      ["exact:n102>n2", "applied"],
+      ["reconcile:w20>w10", "applied"],
+    ]);
+    const exact = applyPlan(identityPlan).osm;
+    expect([...exact.nodes.sorted()].map((node) => node.id)).toEqual([1, 2, 201, 301, 302]);
+    // Way 10 takes the survey's name: an imported way's values win a reconcile (MP-X2).
+    expect([...exact.ways.sorted()]).toEqual([
+      { ...originalBase.ways[0], tags: { highway: "footway", name: "Survey sidewalk" } },
+      originalPatch.ways[1],
+    ]);
 
-    const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const exact = applyChangesetToOsm(generateChangeset(base, patch, options));
-    expect([...exact.ways.sorted()]).toEqual([originalBase.ways[0], originalPatch.ways[1]]);
-    expect([...exact.nodes.sorted()]).toEqual([...nodeResult.nodes.sorted()]);
-
+    // Matching copies 201's tag onto 1; 201 itself stays.
     const conflation = { propertyKeys: ["tactile_paving"], attachNetwork: false };
-    const matching = generateConflationArtifacts(base, patch, { ...options, conflation });
-    expect(entities(matching.ordinaryBaseline)).toEqual(entities(exact));
-    expect(matching.result.nodes.getById(1)).toEqual({
+    const matchingPlan = plan({ createIntersections: false, matching: conflation });
+    const matching = applyPlan(matchingPlan).osm;
+    expect(matching.nodes.getById(1)).toEqual({
       id: 1,
       lon: 0,
       lat: 0,
       tags: { tactile_paving: "yes" },
     });
-    expect([...matching.result.ways.sorted()]).toEqual([...exact.ways.sorted()]);
-    expect(matching.result.nodes.getById(201)).toEqual(patch.nodes.getById(201));
-    expect(matching.outcome.features.find((feature) => feature.sourceId === 201)).toMatchObject({
-      copiedKeys: ["tactile_paving"],
-    });
+    expect([...matching.ways.sorted()]).toEqual([...exact.ways.sorted()]);
+    expect(matching.nodes.getById(201)).toEqual(patch.nodes.getById(201));
+    expect(
+      matchingPlan.matching?.outcome.features.find((feature) => feature.sourceId === 201),
+    ).toMatchObject({ copiedKeys: ["tactile_paving"] });
 
-    const final = applyChangesetToOsm(
-      generateChangeset(matching.result, patch, { createIntersections: true }),
-    );
-    expect(final.nodes.getById(303)).toEqual({
-      id: 303,
+    // Crossings: way 30 crosses way 10 at a new node, a new entity with a negative ID.
+    const final = await merge(base, patch, { matching: conflation }, () => {});
+    expect(final.nodes.getById(-1)).toEqual({
+      id: -1,
       lon: 0.00075,
       lat: 0,
       tags: { crossing: "yes" },
     });
     expect([...final.nodes.sorted()]).toEqual([
-      ...matching.result.nodes.sorted(),
-      final.nodes.getById(303),
+      final.nodes.getById(-1),
+      ...matching.nodes.sorted(),
     ]);
     expect([...final.ways.sorted()]).toEqual([
-      { id: 10, refs: [1, 303, 2], tags: { highway: "footway", name: "Base sidewalk" } },
-      { id: 30, refs: [301, 303, 302], tags: { highway: "footway", name: "New link" } },
+      { id: 10, refs: [1, -1, 2], tags: { highway: "footway", name: "Survey sidewalk" } },
+      { id: 30, refs: [301, -1, 302], tags: { highway: "footway", name: "New link" } },
     ]);
-    expect(
-      entities(
-        await merge(base, patch, { ...options, conflation, createIntersections: true }, () => {}),
-      ),
-    ).toEqual(entities(final));
     expect(entities(base)).toEqual(originalBase);
     expect(entities(patch)).toEqual(originalPatch);
     await expectEntityRoundTrip(final);
   });
 
-  it("MP-E2 distinguishes no-op defaults, whole-entity updates, and absent entities", async () => {
+  it("MP-E2 keeps new patch IDs clear of the base and applies positive IDs as whole edits", async () => {
     const base = dataset("first-file", [
       { id: -1, lon: 0, lat: 0, tags: { name: "Old entrance", wheelchair: "yes" } },
       { id: -2, lon: 0.001, lat: 0, tags: { name: "Keep me" } },
+      { id: 7, lon: 0.001, lat: 0.001, tags: { name: "Main", wheelchair: "yes" } },
     ]);
     const patch = dataset("independent-file", [
       { id: -1, lon: 0.002, lat: 0, tags: { name: "Different entrance" } },
+      { id: 7, lon: 0.001, lat: 0.001, tags: { name: "Main entrance" } },
     ]);
-    expect(await merge(base, patch)).toBe(base);
-    const result = await merge(base, patch, { directMerge: true }, () => {});
-    expect([...result.nodes.sorted()]).toEqual([base.nodes.getById(-2), patch.nodes.getById(-1)]);
-    expect(result.nodes.getById(-1)?.tags).not.toHaveProperty("wheelchair");
-    expect(base.nodes.getById(-1)?.tags).toHaveProperty("wheelchair", "yes");
+    const result = await merge(base, patch, {}, () => {});
+    expect([...result.nodes.sorted()]).toEqual([
+      // Patch node -1 is new: it moves below the base's lowest ID instead of replacing -1.
+      { ...patch.nodes.getById(-1), id: -3 },
+      base.nodes.getById(-2),
+      base.nodes.getById(-1),
+      // Patch node 7 edits base node 7: the whole entity, not a union of tags.
+      patch.nodes.getById(7),
+    ]);
+    expect(base.nodes.getById(7)?.tags).toHaveProperty("wheelchair", "yes");
+    // Negative IDs survive export unchanged.
+    await expectEntityRoundTrip(result);
   });
 
   it.each(["copy", "connect", "copy-connect-remove"] as const)(
@@ -159,36 +175,28 @@ describe("merge-process guide", () => {
       const copy = action !== "connect";
       const connect = action !== "copy";
       const remove = action === "copy-connect-remove";
-      const decisions: OsmConflationDecision[] = [
-        {
-          candidateId: "way:20->10",
-          action: "accept",
-          transferProperties: copy,
-          attachNetwork: false,
-          removeWay: remove,
-        },
-        {
-          candidateId: "node:102->2",
-          action: "accept",
-          transferProperties: false,
-          attachNetwork: connect,
-        },
+      const decisions: PlanDecision[] = [
+        { proposalId: "copy:w20>w10", action: copy ? "accept" : "reject" },
+        { proposalId: "connect:n102>n2", action: connect ? "accept" : "reject" },
+        ...(remove ? [{ proposalId: "remove:w20>w10", action: "accept" as const }] : []),
       ];
-      const generated = generateConflationArtifacts(
+      const generated = planMerge(
         base,
         patch,
         {
-          directMerge: true,
-          conflation: {
+          mergeIdenticalPoints: false,
+          createIntersections: false,
+          matching: {
             propertyKeys: ["name"],
             attachNetwork: true,
             allowWayRemoval: true,
             automatic: "none",
           },
+          decisions,
         },
-        decisions,
+        () => {},
       );
-      const result = generated.result;
+      const result = applyPlan(generated).osm;
       expect([...result.ways.sorted()]).toEqual([
         {
           id: 10,
@@ -206,11 +214,15 @@ describe("merge-process guide", () => {
             ]),
         { id: 30, refs: connect ? [2, 103] : [102, 103], tags: { highway: "footway" } },
       ]);
-      // 101 is tagged; 102 was already orphaned by attachment before removal.
-      expect([...result.nodes.sorted()]).toEqual([...base.nodes.sorted(), ...patch.nodes.sorted()]);
+      // 101 is tagged, so it stays; the connection drops untagged 102, which it left unused.
+      expect([...result.nodes.sorted()]).toEqual([
+        ...base.nodes.sorted(),
+        ...patch.nodes.sorted().filter((node) => !connect || node.id !== 102),
+      ]);
       if (remove) {
         expect(
-          generated.outcome.features.find((feature) => feature.sourceId === 20)?.wayRemoval,
+          generated.matching?.outcome.features.find((feature) => feature.sourceId === 20)
+            ?.wayRemoval,
         ).toMatchObject({ orphanNodeIds: [], retainedTaggedNodeIds: [101] });
       }
       await expectEntityRoundTrip(result);

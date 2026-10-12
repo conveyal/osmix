@@ -8,21 +8,11 @@
  * @module
  */
 
-import type {
-  OsmChangesetOptions,
-  OsmChangeTypes,
-  OsmConflationBulkDecisionRequest,
-  OsmConflationCandidate,
-  OsmConflationCandidateFilter,
-  OsmConflationDecision,
-  OsmConflationOptions,
-  OsmMergeOptions,
-} from "@osmix/change";
-import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
+import type { OsmChangeTypes, MergePlanOptions, PlanDecision } from "@osmix/change";
 import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
-import { type OsmFromPbfOptions, type OsmLoadDecision, toPbfStream } from "@osmix/load";
+import type { OsmFromPbfOptions, OsmLoadDecision } from "@osmix/load";
 import type {
   DefaultSpeeds,
   HighwayFilter,
@@ -33,7 +23,7 @@ import type {
 import { inspectBackingBuffers, isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
-import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
+import type { GeoBbox2D, LonLat, OsmEntityType, Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 
 import {
@@ -43,6 +33,7 @@ import {
   type WorkerRuntime,
 } from "./capabilities.ts";
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
+import type { MergeMatchingFilter, MergePlanBulkRequest, MergePlanFilter } from "./plan-session.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
 import {
@@ -52,7 +43,7 @@ import {
   type OsmixWorkerPool,
   type OsmixWorkerPoolDiagnostics,
 } from "./worker-pool.ts";
-import { type OsmConflationPageOptions, OsmixWorker } from "./worker.ts";
+import { OsmixWorker } from "./worker.ts";
 
 installStructuredComlinkErrorTransferHandler();
 
@@ -98,35 +89,41 @@ type DatasetProxyMethodName =
   | "getVectorTile"
   | "getRasterTile"
   | "toPbfData"
+  | "toPbfBlob"
+  | "toPbfFile"
   | "toPbf"
+  | "negativeIdMap"
   | "transferOut"
   | "delete"
   | "buildRoutingGraph"
   | "hasRoutingGraph"
   | "findNearestRoutableNode"
   | "route"
-  | "generateChangeset"
+  | "planDeduplication"
   | "applyChangesAndReplace"
   | "setChangesetFilters"
   | "getChangesetPage"
   | "synchronizeDataset";
 
-type ConflationDatasetProxyMethodName =
-  | "applyConflationBulkDecision"
-  | "discoverConflation"
-  | "getConflationSummary"
-  | "setConflationFilter"
-  | "getConflationPage"
-  | "setConflationDecision"
-  | "setConflationDecisions"
-  | "setConflationSourceDecision"
-  | "generateConflationChangeset"
-  | "clearConflation";
+type PlanDatasetProxyMethodName =
+  | "planMerge"
+  | "getMergePlanOverview"
+  | "setMergePlanFilter"
+  | "getMergePlanPage"
+  | "getMergePlanFeature"
+  | "getMergePlanFeaturePage"
+  | "getMergePlanTile"
+  | "getMergeMatchingPage"
+  | "getMergeUncopiedTagPage"
+  | "getMergePlanOsc"
+  | "setMergePlanDecisions"
+  | "applyMergePlanBulk"
+  | "previewMergePlanBulk"
+  | "applyMergePlan"
+  | "clearMergePlan";
 
 type OsmRemoteDatasetMethods<T extends OsmixWorker> = {
-  [K in DatasetProxyMethodName | ConflationDatasetProxyMethodName]: BoundDatasetMethod<
-    OsmixRemote<T>[K]
-  >;
+  [K in DatasetProxyMethodName | PlanDatasetProxyMethodName]: BoundDatasetMethod<OsmixRemote<T>[K]>;
 };
 
 type DatasetMemberMethodName = "size" | "getById" | "search";
@@ -194,7 +191,7 @@ class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmIn
     this.id = toId;
   }
 
-  merge(patch: OsmId, options: Partial<OsmMergeOptions> = {}) {
+  merge(patch: OsmId, options: MergePlanOptions = {}) {
     return this.remote.merge(this, patch, options);
   }
 }
@@ -304,14 +301,17 @@ export class OsmixRemoteStateError extends Error {
   }
 }
 
+/** The mutations that can commit before their result reaches every worker. */
+export type OsmixCommittedMutation = "applyChangesAndReplace" | "applyMergePlan" | "merge";
+
 /** A worker mutation succeeded, but subsequent synchronization or result lookup failed. */
 export class OsmixCommittedMutationError extends Error {
   readonly committed = true;
-  readonly operation: "applyChangesAndReplace" | "merge";
+  readonly operation: OsmixCommittedMutation;
   readonly osmId: string;
   override readonly cause: unknown;
 
-  constructor(operation: "applyChangesAndReplace" | "merge", osmId: string, cause: unknown) {
+  constructor(operation: OsmixCommittedMutation, osmId: string, cause: unknown) {
     super(
       `The ${operation} operation committed dataset ${osmId}, but synchronizing the result failed. Retry synchronization and refresh; do not apply the merge again.`,
       { cause },
@@ -374,7 +374,7 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
  * TypeScript source (monorepo dev) and from the built `dist` output
  * (published package in Node, CDNs, and unbundled ESM).
  */
-export function defaultWorkerUrl(): URL {
+function defaultWorkerUrl(): URL {
   return defaultOsmixWorkerUrl(import.meta.url);
 }
 
@@ -385,6 +385,22 @@ const workerCleanup = new WeakMap<object, WorkerCleanup>();
 function hasOnlySharedBackingBuffers(value: unknown): boolean {
   const inspection = inspectBackingBuffers(value);
   return inspection.unique > 0 && inspection.arrayBuffers === 0;
+}
+
+/**
+ * A merge plan could not be rebuilt after a worker restart because a restored input is not the
+ * data the plan was made from. The plan and its decisions are gone; plan again.
+ */
+export class OsmixPlanRecoveryError extends Error {
+  readonly baseOsmId: string;
+  readonly patchOsmId: string;
+
+  constructor(baseOsmId: string, patchOsmId: string, detail: string) {
+    super(`The merge plan for ${baseOsmId} cannot be restored: ${detail}. Plan the merge again.`);
+    this.name = "OsmixPlanRecoveryError";
+    this.baseOsmId = baseOsmId;
+    this.patchOsmId = patchOsmId;
+  }
 }
 
 /**
@@ -428,19 +444,21 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
  * })
  * // remote.getWorker() returns Comlink.Remote<MyWorker>
  */
+/** Duplicate fixes waiting for review: rebuilt after a restart from the same dataset. */
 interface ActiveChangesetState {
-  baseOsmId: string;
-  kind: "ordinary" | "conflation";
-  options: Partial<OsmMergeOptions>;
-  patchOsmId: string;
+  osmId: string;
 }
 
-interface ActiveConflationState {
+/** What rebuilds a merge plan after a worker restart. */
+interface ActivePlanState {
   baseOsmId: string;
-  decisions: OsmConflationDecision[];
-  filter: OsmConflationCandidateFilter;
-  options: OsmConflationOptions;
   patchOsmId: string;
+  /** Plan options without decisions. */
+  options: MergePlanOptions;
+  decisions: PlanDecision[];
+  filter: MergePlanFilter;
+  /** The inputs' content hashes when planned; a restored input must match. */
+  inputs: { base: string; patch: string };
 }
 
 type DatasetRestorer<T extends OsmixWorker> = (
@@ -452,7 +470,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   private readonly activeChangesets = new Map<string, ActiveChangesetState>();
   private changesetChangeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private changesetEntityTypes: OsmEntityType[] = ["node", "way", "relation"];
-  private readonly activeConflations = new Map<string, ActiveConflationState>();
+  private readonly activePlans = new Map<string, ActivePlanState>();
   private readonly datasetRestorers = new Map<string, DatasetRestorer<T> | null>();
   private readonly retainedDatasets = new Map<string, OsmTransferables>();
   private readonly retainedLoadDecisions = new Map<string, OsmLoadDecision | null>();
@@ -682,26 +700,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const id = this.getId(osmId);
     // Dataset IDs are logical keys and loaders may replace the contents under one.
     // Candidate evidence and decisions are invalid as soon as either input changes.
-    for (const [baseOsmId, state] of this.activeConflations) {
-      if (baseOsmId === id || state.patchOsmId === id) {
-        this.activeConflations.delete(baseOsmId);
-      }
+    this.activeChangesets.delete(id);
+    for (const [baseOsmId, state] of this.activePlans) {
+      if (baseOsmId === id || state.patchOsmId === id) this.activePlans.delete(baseOsmId);
     }
-    for (const [baseOsmId, state] of this.activeChangesets) {
-      if (baseOsmId === id || state.patchOsmId === id) this.activeChangesets.delete(baseOsmId);
-    }
-  }
-
-  private invalidateGeneratedConflationChangeset(baseOsmId: string) {
-    if (this.activeChangesets.get(baseOsmId)?.kind === "conflation") {
-      this.activeChangesets.delete(baseOsmId);
-    }
-  }
-
-  private getActiveConflation(baseOsmId: string): ActiveConflationState {
-    const state = this.activeConflations.get(baseOsmId);
-    if (!state) throw Error("No active conflation session");
-    return state;
   }
 
   /** Mark changed data as known but not reproducible from its original source. */
@@ -769,25 +771,34 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       await worker.transferRoutingGraphIn(osmId, transferables);
     }
     if (index === 0) {
-      for (const state of this.activeConflations.values()) {
-        // Recovery reproduces review state by rediscovering from restored untouched
-        // inputs, then replaying stable ID-based decisions and filters.
-        await worker.discoverConflation(state.baseOsmId, state.patchOsmId, {
-          ...state.options,
-          decisions: undefined,
-        });
-        await worker.setConflationFilter(state.baseOsmId, state.filter);
-        await worker.restoreConflationReview(state.baseOsmId, state.decisions);
-      }
-      // Candidate review and generated output have independent lifetimes. Only
-      // the latest successful generation for each base may replace its preview.
       for (const state of this.activeChangesets.values()) {
-        if (state.kind === "conflation") {
-          await worker.generateConflationChangeset(state.baseOsmId, state.options);
-        } else {
-          await worker.generateChangeset(state.baseOsmId, state.patchOsmId, state.options);
-        }
+        await worker.planDeduplication(state.osmId);
       }
+      // A plan is rebuilt from its inputs, options and decisions, never deserialized, and
+      // only when the restored inputs are the data it was made from.
+      let planFailure: OsmixPlanRecoveryError | undefined;
+      for (const [baseOsmId, state] of this.activePlans) {
+        const [base, patch] = await Promise.all([
+          worker.contentHash(state.baseOsmId),
+          worker.contentHash(state.patchOsmId),
+        ]);
+        if (base !== state.inputs.base || patch !== state.inputs.patch) {
+          this.activePlans.delete(baseOsmId);
+          planFailure ??= new OsmixPlanRecoveryError(
+            state.baseOsmId,
+            state.patchOsmId,
+            `restored ${base !== state.inputs.base ? "base" : "patch"} content differs`,
+          );
+          continue;
+        }
+        await worker.planMerge(state.baseOsmId, state.patchOsmId, {
+          ...state.options,
+          decisions: state.decisions,
+        });
+        await worker.setMergePlanFilter(state.baseOsmId, state.filter);
+      }
+      // Other state is restored first, so only the stale plan is lost.
+      if (planFailure) throw planFailure;
       await worker.setChangesetFilters(this.changesetChangeTypes, this.changesetEntityTypes);
     }
   }
@@ -913,6 +924,26 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
+   * Create an extract of a loaded dataset under `options.id`, leaving the source untouched. The
+   * bbox, strategy and tag filters behave exactly as with `fromPbf` extract options. The result
+   * is recovered after a worker restart from its shared buffers, not by extracting again.
+   */
+  async extract(
+    sourceOsmId: OsmId,
+    options: Partial<OsmFromPbfOptions> & { id: string; extractBbox: GeoBbox2D },
+  ) {
+    const sourceId = this.getId(sourceOsmId);
+    const osmInfo = await this.runWithWorker(
+      (worker) => worker.extract({ sourceId, options: structuredClone(options) }),
+      { lane: "control", retry: "never" },
+    );
+    this.invalidateMergeStateForDataset(osmInfo.id);
+    this.datasetRestorers.set(osmInfo.id, null);
+    await this.populateDatasetFromControl(osmInfo.id);
+    return this.wrap(osmInfo);
+  }
+
+  /**
    * Serialize an `Osm` instance to PBF and pipe into the provided writable stream.
    * Requires browser support for transferable streams.
    */
@@ -938,13 +969,46 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
+   * Serialize an `Osm` instance to PBF and write it through a `FileSystemFileHandle`, such as one
+   * from `showSaveFilePicker()`. The handle is cloned to a worker, which writes to disk directly,
+   * so this does not need transferable streams.
+   */
+  toPbfFile(
+    osmId: OsmId,
+    fileHandle: FileSystemFileHandle,
+    options: { renumberNegativeIds?: boolean } = {},
+  ) {
+    return this.runWithWorker(
+      (worker) => worker.toPbfFile({ osmId: this.getId(osmId), fileHandle, ...options }),
+      { lane: "any", retry: "never" },
+    );
+  }
+
+  /** The old → new IDs a `renumberNegativeIds` export of this dataset uses. */
+  negativeIdMap(osmId: OsmId) {
+    return this.runWithWorker((worker) => worker.negativeIdMap(this.getId(osmId)), {
+      retry: "once",
+    });
+  }
+
+  /**
+   * Serialize an `Osm` instance to a PBF `Blob` in a worker.
+   * Avoids the contiguous copy that `toPbfData` makes; browsers can page large blobs to disk.
+   */
+  toPbfBlob(osmId: OsmId, options: { renumberNegativeIds?: boolean } = {}) {
+    return this.runWithWorker((worker) => worker.toPbfBlob(this.getId(osmId), options), {
+      retry: "once",
+    });
+  }
+
+  /**
    * Serialize an `Osm` instance to PBF and write to the provided stream.
-   * Automatically selects worker-based streaming or fallback based on browser support.
+   * Transfers the stream to a worker when supported; otherwise pipes a worker-built `Blob`.
    */
   async toPbf(osmId: OsmId, stream: WritableStream<Uint8Array>) {
     if (supportsReadableStreamTransfer()) return this.toPbfStream(osmId, stream);
-    const osm = await this.get(osmId);
-    return toPbfStream(osm).pipeTo(stream);
+    const blob = await this.toPbfBlob(osmId);
+    return blob.stream().pipeTo(stream);
   }
 
   /**
@@ -1218,7 +1282,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    */
   async readHeader(data: ArrayBuffer | ReadableStream | Uint8Array | File) {
     const transferableData = await this.getTransferableData(data);
-    return this.runWithWorker((worker) => worker.readHeader(transferableData), {
+    // Streams (a File is sent as its stream) can only cross to the worker when transferred.
+    return this.runWithWorker((worker) => worker.readHeader(transfer(transferableData)), {
       retry: "never",
     });
   }
@@ -1359,6 +1424,34 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       await worker.delete(from);
       await worker.transferIn(updatedTransferables, loadDecision);
     });
+  }
+
+  /**
+   * Register an `Osm` instance under a second ID in all workers, keeping the original. With
+   * SharedArrayBuffer-backed data both IDs share the same buffers, so the copy costs no memory
+   * for entities. Mutations that replace one ID (merges, applied changes) leave the other alone.
+   */
+  async copy(fromId: OsmId, toId: string): Promise<void> {
+    const from = this.getId(fromId);
+    if (from === toId) throw Error(`Cannot copy dataset ${from} onto itself.`);
+    const { loadDecision, transferables } = await this.runWithWorker(
+      async (worker) => ({
+        loadDecision: await worker.getLoadDecision(from),
+        transferables: await worker.getOsmBuffers(from),
+      }),
+      { lane: "control", retry: "once" },
+    );
+    this.invalidateMergeStateForDataset(toId);
+    const copiedTransferables = { ...transferables, id: toId };
+    this.unregisterDatasetForRecovery(toId);
+    this.datasetRestorers.set(toId, this.datasetRestorers.get(from) ?? null);
+    if (hasOnlySharedBackingBuffers(copiedTransferables)) {
+      this.retainedDatasets.set(toId, copiedTransferables);
+      this.retainedLoadDecisions.set(toId, loadDecision);
+    }
+    await this.broadcastStateChange("dataset copy", (worker) =>
+      worker.transferIn(copiedTransferables, loadDecision),
+    );
   }
 
   /**
@@ -1544,174 +1637,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   // Merge & Changesets
   // ---------------------------------------------------------------------------
 
-  /** Discover fuzzy cross-dataset candidates without changing either input dataset. */
-  async discoverConflation(baseOsmId: OsmId, patchOsmId: OsmId, options: OsmConflationOptions) {
-    const baseId = this.getId(baseOsmId);
-    const patchId = this.getId(patchOsmId);
-    // Recovery state must not share mutable decisions or option arrays with callers.
-    const storedOptions = structuredClone(options);
-    const result = await this.runWithWorker(
-      (worker) => worker.discoverConflation(baseId, patchId, storedOptions),
-      { lane: "control", retry: "never" },
-    );
-    this.invalidateGeneratedConflationChangeset(baseId);
-    this.activeConflations.set(baseId, {
-      baseOsmId: baseId,
-      decisions: storedOptions.decisions ?? [],
-      filter: {},
-      options: storedOptions,
-      patchOsmId: patchId,
-    });
-    return result;
-  }
-
-  /** Return the current, decision-aware candidate summary. */
-  getConflationSummary(baseOsmId: OsmId) {
-    return this.runWithWorker((worker) => worker.getConflationSummary(this.getId(baseOsmId)), {
-      lane: "control",
-      retry: "once",
-    });
-  }
-
-  /** Set the filter used by subsequent candidate page requests. */
-  async setConflationFilter(baseOsmId: OsmId, filter: OsmConflationCandidateFilter = {}) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedFilter = structuredClone(filter);
-    await this.runWithWorker((worker) => worker.setConflationFilter(baseId, storedFilter), {
-      lane: "control",
-      retry: "never",
-    });
-    state.filter = storedFilter;
-  }
-
-  /** Retrieve filtered candidates, optionally keeping every alternative for each source together. */
-  getConflationPage(
-    baseOsmId: OsmId,
-    page: number,
-    pageSize: number,
-    options: OsmConflationPageOptions = {},
-  ) {
-    const storedOptions = structuredClone(options);
-    return this.runWithWorker(
-      (worker) => worker.getConflationPage(this.getId(baseOsmId), page, pageSize, storedOptions),
-      { lane: "control", retry: "once" },
-    );
-  }
-
-  /** Record or replace a single candidate decision. */
-  async setConflationDecision(baseOsmId: OsmId, decision: OsmConflationDecision) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedDecision = structuredClone(decision);
-    const result = await this.runWithWorker(
-      (worker) => worker.setConflationDecision(baseId, storedDecision),
-      { lane: "control", retry: "never" },
-    );
-    state.decisions = [
-      ...state.decisions.filter((existing) => existing.candidateId !== storedDecision.candidateId),
-      storedDecision,
-    ];
-    this.invalidateGeneratedConflationChangeset(baseId);
-    return result;
-  }
-
-  /** Replace all candidate decisions for the active session. */
-  async setConflationDecisions(baseOsmId: OsmId, decisions: OsmConflationDecision[]) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedDecisions = structuredClone(decisions);
-    const result = await this.runWithWorker(
-      (worker) => worker.setConflationDecisions(baseId, storedDecisions),
-      { lane: "control", retry: "never" },
-    );
-    state.decisions = storedDecisions;
-    this.invalidateGeneratedConflationChangeset(baseId);
-    return result;
-  }
-
-  /** Replace one imported feature's target choices while preserving all unrelated review decisions. */
-  async setConflationSourceDecision(
-    baseOsmId: OsmId,
-    source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
-    selected: OsmConflationDecision | null,
-  ) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedSource = structuredClone(source);
-    const storedSelected = structuredClone(selected);
-    const result = await this.runWithWorker(
-      (worker) => worker.setConflationSourceDecision(baseId, storedSource, storedSelected),
-      { lane: "control", retry: "never" },
-    );
-    state.decisions = result.decisions.map((decision) => ({ ...decision }));
-    this.invalidateGeneratedConflationChangeset(baseId);
-    return {
-      decisions: result.decisions.map((decision) => ({ ...decision })),
-      summary: { ...result.summary },
-    };
-  }
-
-  /** Apply one action to all eligible candidates matching a filter across every page. */
-  async applyConflationBulkDecision(baseOsmId: OsmId, request: OsmConflationBulkDecisionRequest) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedRequest = structuredClone(request);
-    const result = await this.runWithWorker(
-      (worker) => worker.applyConflationBulkDecision(baseId, storedRequest),
-      { lane: "control", retry: "never" },
-    );
-    state.decisions = result.decisions.map((decision) => ({ ...decision }));
-    if (result.preview.changedCandidates > 0) {
-      this.invalidateGeneratedConflationChangeset(baseId);
-    }
-    return {
-      decisions: result.decisions.map((decision) => ({ ...decision })),
-      preview: { ...result.preview },
-      summary: { ...result.summary },
-    };
-  }
-
-  /**
-   * Generate the cumulative direct, exact, and accepted fuzzy changeset.
-   * Inputs remain untouched until {@link applyChangesAndReplace} is called.
-   */
-  async generateConflationChangeset(baseOsmId: OsmId, mergeOptions: Partial<OsmMergeOptions> = {}) {
-    const baseId = this.getId(baseOsmId);
-    const state = this.getActiveConflation(baseId);
-    const storedOptions = structuredClone({ ...mergeOptions, conflation: undefined });
-    const result = await this.runWithWorker(
-      (worker) => worker.generateConflationChangeset(baseId, storedOptions),
-      { lane: "control", retry: "never" },
-    );
-    this.activeChangesets.set(baseId, {
-      baseOsmId: baseId,
-      kind: "conflation",
-      patchOsmId: state.patchOsmId,
-      options: storedOptions,
-    });
-    // In-process workers do not cross a cloning boundary. Keep this run's
-    // completion report independent of later review and generation changes.
-    return structuredClone(result);
-  }
-
-  /** Cancel a review session and discard only a preview generated from that session. */
-  async clearConflation(baseOsmId: OsmId) {
-    const baseId = this.getId(baseOsmId);
-    await this.runWithWorker((worker) => worker.clearConflation(baseId), {
-      lane: "control",
-      retry: "never",
-    });
-    this.invalidateGeneratedConflationChangeset(baseId);
-    this.activeConflations.delete(baseId);
-  }
-
   /**
    * Merge two `Osm` instances in a worker.
    * Replaces the base instance with the merge result and deletes the patch instance.
    * Synchronizes the merged result across all workers.
    */
-  async merge(baseOsmId: OsmId, patchOsmId: OsmId, options: Partial<OsmMergeOptions> = {}) {
+  async merge(baseOsmId: OsmId, patchOsmId: OsmId, options: MergePlanOptions = {}) {
     const osmId = await this.runWithWorker(
       (worker) => worker.merge(this.getId(baseOsmId), this.getId(patchOsmId), options),
       { lane: "control", retry: "never" },
@@ -1733,31 +1664,202 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
-   * Generate a changeset comparing base and patch `Osm` instances in the changeset worker.
-   * Returns statistics about the changeset (create/modify/delete counts).
+   * Plan merging `patch` into `base` for review. Neither dataset changes until
+   * {@link applyMergePlan}. After a worker restart the plan is rebuilt from the same inputs,
+   * options and decisions.
    */
-  async generateChangeset(
-    baseOsmId: OsmId,
-    patchOsmId: OsmId,
-    options: Partial<OsmChangesetOptions> = {},
-  ) {
-    // Validate the original object: cloning can discard inherited or hidden
-    // options and turn an unsupported request into an ordinary preview.
-    validateOrdinaryChangesetOptions(options);
+  async planMerge(baseOsmId: OsmId, patchOsmId: OsmId, options: MergePlanOptions = {}) {
     const baseId = this.getId(baseOsmId);
     const patchId = this.getId(patchOsmId);
-    const storedOptions = structuredClone(options);
-    const result = await this.runWithWorker(
-      (worker) => worker.generateChangeset(baseId, patchId, storedOptions),
+    const stored = structuredClone(options);
+    const overview = await this.runWithWorker(
+      (worker) => worker.planMerge(baseId, patchId, stored),
       { lane: "control", retry: "never" },
     );
-    this.activeChangesets.set(baseId, {
+    const { decisions: _decisions, ...withoutDecisions } = stored;
+    this.activePlans.set(baseId, {
       baseOsmId: baseId,
-      kind: "ordinary",
-      options: storedOptions,
       patchOsmId: patchId,
+      options: withoutDecisions,
+      decisions: overview.decisions,
+      filter: {},
+      inputs: { base: overview.inputs.base.contentHash, patch: overview.inputs.patch.contentHash },
     });
-    return result;
+    return structuredClone(overview);
+  }
+
+  getMergePlanOverview(baseOsmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getMergePlanOverview(this.getId(baseOsmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  /** Set the filter used by subsequent feature page requests. */
+  async setMergePlanFilter(baseOsmId: OsmId, filter: MergePlanFilter = {}) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(filter);
+    await this.runWithWorker((worker) => worker.setMergePlanFilter(baseId, stored), {
+      lane: "control",
+      retry: "never",
+    });
+    state.filter = stored;
+  }
+
+  getMergePlanPage(baseOsmId: OsmId, page: number, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanPage(this.getId(baseOsmId), page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /** The review page a feature is on under the current filter, or null when it is hidden. */
+  getMergePlanFeaturePage(baseOsmId: OsmId, featureKey: string, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanFeaturePage(this.getId(baseOsmId), featureKey, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  getMergePlanFeature(baseOsmId: OsmId, featureKey: string) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanFeature(this.getId(baseOsmId), featureKey),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /**
+   * One vector tile of the plan's imported features with their current outcomes (see
+   * `PLAN_TILE_LAYERS`). Plans live on the control worker, so tiles are drawn there. Empty when
+   * no plan is open.
+   */
+  getMergePlanTile(baseOsmId: OsmId, tile: Tile, signal?: AbortSignal) {
+    return this.runWithWorker((worker) => worker.getMergePlanTile(this.getId(baseOsmId), tile), {
+      lane: "control",
+      retry: "once",
+      signal,
+    });
+  }
+
+  /**
+   * One page of the matching outcome's features, from the open plan or, once it is applied, the
+   * applied plan until the next plan or clear for this base. Throws when neither remains, such
+   * as after a worker restart.
+   */
+  getMergeMatchingPage(
+    baseOsmId: OsmId,
+    filter: MergeMatchingFilter,
+    page: number,
+    pageSize: number,
+  ) {
+    return this.runWithWorker(
+      (worker) => worker.getMergeMatchingPage(this.getId(baseOsmId), filter, page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /** One page of the features whose value for tag `key` was not copied; see above. */
+  getMergeUncopiedTagPage(baseOsmId: OsmId, key: string, page: number, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergeUncopiedTagPage(this.getId(baseOsmId), key, page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  getMergePlanOsc(baseOsmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getMergePlanOsc(this.getId(baseOsmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  /** Replace every decision and replan the phases they affect. */
+  async setMergePlanDecisions(baseOsmId: OsmId, decisions: PlanDecision[]) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(decisions);
+    const overview = await this.runWithWorker(
+      (worker) => worker.setMergePlanDecisions(baseId, stored),
+      { lane: "control", retry: "never" },
+    );
+    state.decisions = overview.decisions;
+    return structuredClone(overview);
+  }
+
+  /** Accept, reject, or clear decisions for every proposal a filter matches. */
+  async applyMergePlanBulk(baseOsmId: OsmId, request: MergePlanBulkRequest) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(request);
+    const result = await this.runWithWorker((worker) => worker.applyMergePlanBulk(baseId, stored), {
+      lane: "control",
+      retry: "never",
+    });
+    state.decisions = result.overview.decisions;
+    return structuredClone(result);
+  }
+
+  /**
+   * What accepting, rejecting, and clearing would do to the features `filter` shows (by default
+   * the filter set with {@link setMergePlanFilter}), counted in features, without deciding.
+   */
+  previewMergePlanBulk(baseOsmId: OsmId, filter?: MergePlanFilter) {
+    return this.runWithWorker(
+      (worker) => worker.previewMergePlanBulk(this.getId(baseOsmId), filter),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /**
+   * Apply the plan: replace the base with the merged result, delete the patch, and
+   * synchronize every worker. A failure after the worker applied throws
+   * {@link OsmixCommittedMutationError}; do not apply again.
+   */
+  async applyMergePlan(baseOsmId: OsmId) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const result = await this.runWithWorker((worker) => worker.applyMergePlan(baseId), {
+      lane: "control",
+      retry: "never",
+    });
+    this.invalidateMergeStateForDataset(baseId);
+    this.invalidateMergeStateForDataset(state.patchOsmId);
+    this.markDatasetUnrecoverable(baseId);
+    try {
+      await this.delete(state.patchOsmId);
+      await this.populateDatasetFromControl(baseId);
+      const merged = await this.get(baseId);
+      return { dataset: this.wrap(merged.info()), summary: result.summary, stats: result.stats };
+    } catch (cause) {
+      throw new OsmixCommittedMutationError("applyMergePlan", baseId, cause);
+    }
+  }
+
+  async clearMergePlan(baseOsmId: OsmId) {
+    const baseId = this.getId(baseOsmId);
+    await this.runWithWorker((worker) => worker.clearMergePlan(baseId), {
+      lane: "control",
+      retry: "never",
+    });
+    this.activePlans.delete(baseId);
+  }
+
+  /** Find duplicates inside one dataset; review them with the changeset page API. */
+  async planDeduplication(osmId: OsmId) {
+    const id = this.getId(osmId);
+    const stats = await this.runWithWorker((worker) => worker.planDeduplication(id), {
+      lane: "control",
+      retry: "never",
+    });
+    this.activeChangesets.set(id, { osmId: id });
+    return stats;
+  }
+
+  private getActivePlan(baseOsmId: string): ActivePlanState {
+    const state = this.activePlans.get(baseOsmId);
+    if (!state) throw Error("No active merge plan");
+    return state;
   }
 
   /**
@@ -1812,7 +1914,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const pool = this.workerPool;
     this.workerPool = null;
     this.activeChangesets.clear();
-    this.activeConflations.clear();
+    this.activePlans.clear();
     this.datasetRestorers.clear();
     this.retainedDatasets.clear();
     this.retainedLoadDecisions.clear();

@@ -33,6 +33,7 @@ export function createVtServerApp({
   app.get("/meta.json", async (c) => {
     const osm = await state.dataset.get();
     const bbox = osm.bbox();
+    if (bbox === null) return c.json({ error: `${state.filename} contains no nodes` }, 422);
     const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
     return c.json({
       filename: state.filename,

@@ -1,5 +1,5 @@
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils";
-import { fromPbf, Osm, type LonLat, type OsmTags } from "osmix";
+import { fromPbf, Osm, type GeoBbox2D, type LonLat, type OsmTags } from "osmix";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MapCamera, type MapViewport, worldToLonLat } from "../src/camera.ts";
@@ -11,6 +11,13 @@ import {
   type LabelTextMeasurer,
   type MapLabelCandidate,
 } from "../src/map-labels.ts";
+
+/** Bbox of a test dataset that is known to contain nodes. */
+function datasetBbox(dataset: Osm): GeoBbox2D {
+  const bbox = dataset.bbox();
+  if (bbox === null) throw Error("Test dataset has no nodes");
+  return bbox;
+}
 
 function candidate(overrides: Partial<MapLabelCandidate> = {}): MapLabelCandidate {
   return {
@@ -356,7 +363,7 @@ describe("Monaco label detail", () => {
 
   it("shows major road labels at fit zoom and progressively richer close detail", () => {
     const viewport = { width: 100, height: 62 };
-    const fitted = MapCamera.fitBounds(osm.bbox(), viewport);
+    const fitted = MapCamera.fitBounds(datasetBbox(osm), viewport);
     const overview = collectMapLabelCandidates(osm, fitted, viewport);
     const detailed = collectMapLabelCandidates(
       osm,
@@ -377,7 +384,7 @@ describe("Monaco label detail", () => {
 
   it("lays out fixture labels without overlap or status-row intrusion", () => {
     const pixelViewport = { width: 100, height: 62 };
-    const camera = MapCamera.fitBounds(osm.bbox(), pixelViewport);
+    const camera = MapCamera.fitBounds(datasetBbox(osm), pixelViewport);
     const candidates = collectMapLabelCandidates(osm, camera, pixelViewport);
     const labels = layoutMapLabels(candidates, { width: 100, height: 31 }, simpleMeasure);
 

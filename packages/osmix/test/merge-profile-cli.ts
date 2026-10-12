@@ -3,12 +3,11 @@ import { arch, cpus, platform, totalmem } from "node:os";
 
 import { getFixtureFileReadStream, getFixturePath, PBFs } from "@osmix/test-utils/fixtures";
 
-import { fromPbf, toPbfBuffer, type Osm, type OsmMergeOptions } from "../src/index.ts";
+import { fromPbf, toPbfBuffer, type MergePlanOptions, type Osm } from "../src/index.ts";
 import {
   measureMergeProfileTask,
   osmEntityCounts,
   profileMerge,
-  profileWorkerConflation,
   type MergeProfileOperationCounts,
   type MergeProfileRun,
   type MergeProfileStage,
@@ -21,15 +20,14 @@ interface ScenarioDefinition {
   baseFixture: string;
   patchFixture: string;
   defaultRuns: number;
-  options: Partial<OsmMergeOptions>;
-  workerConflation?: boolean;
+  options: MergePlanOptions;
 }
 
 interface MergeProfileReport {
   schemaVersion: 1;
   scenario: MergeProfileScenario;
   fixtures: { base: string; patch: string };
-  mergeOptions: Partial<OsmMergeOptions>;
+  mergeOptions: MergePlanOptions;
   startedAt: string;
   runtime: {
     node: string;
@@ -48,40 +46,31 @@ interface MergeProfileReport {
   };
 }
 
-const ALL_MERGE_STEPS = {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-} as const;
-
 const SCENARIOS: Record<MergeProfileScenario, ScenarioDefinition> = {
   monaco: {
     baseFixture: PBFs["monaco"]!.url,
     patchFixture: "generated Monaco routing patch",
     defaultRuns: 5,
-    options: ALL_MERGE_STEPS,
+    options: {},
   },
   yakima: {
     baseFixture: "yakima-full.osm.pbf",
     patchFixture: "yakima.osw.pbf",
     defaultRuns: 3,
     options: {
-      ...ALL_MERGE_STEPS,
-      conflation: {
+      matching: {
         propertyKeys: ["barrier", "crossing", "kerb", "tactile_paving"],
         attachNetwork: true,
         maxDistanceMeters: 1,
         automatic: "high-confidence",
       },
     },
-    workerConflation: true,
   },
   "eastern-washington": {
     baseFixture: "osmix-e_wa_osm.pbf",
     patchFixture: "east_washington_sidewalk_proviso_1.pbf",
     defaultRuns: 1,
-    options: ALL_MERGE_STEPS,
+    options: {},
   },
 };
 
@@ -250,9 +239,7 @@ async function main(): Promise<void> {
     for (let run = 1; run <= runCount; run++) {
       globalThis.gc?.();
       const { base, patch, stages } = await loadInputs(scenario, definition);
-      const profile = definition.workerConflation
-        ? await profileWorkerConflation(base, patch, definition.options, { run })
-        : await profileMerge(base, patch, definition.options, { run });
+      const profile = await profileMerge(base, patch, definition.options, { run });
       profile.stages.unshift(...stages);
       profile.wallDurationMs =
         Math.round(

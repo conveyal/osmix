@@ -1,11 +1,19 @@
 import { pointToTile } from "@mapbox/tilebelt";
 import { VectorTile } from "@mapbox/vector-tile";
 import { Osm } from "@osmix/core";
+import { assertValue } from "@osmix/shared/assert";
 import type { GeoBbox2D, Tile } from "@osmix/types";
 import { PbfReader } from "pbf";
 import { describe, expect, it, vi } from "vitest";
 
 import { ShortbreadVtEncoder } from "./encoder.ts";
+
+/** Bbox of a test dataset that is known to contain nodes. */
+function datasetBbox(dataset: Osm): GeoBbox2D {
+  const bbox = dataset.bbox();
+  assertValue(bbox, "Test dataset has no nodes");
+  return bbox;
+}
 
 function decodeTile(data: ArrayBuffer) {
   const tile = new VectorTile(new PbfReader(data));
@@ -34,7 +42,9 @@ describe("ShortbreadVtEncoder", () => {
     const allNodeQuery = vi.spyOn(osm.nodes, "findIndexesWithinBbox");
     const encoder = new ShortbreadVtEncoder(osm);
 
-    const features = Array.from(encoder["classifyNodes"](osm.bbox(), ([lon, lat]) => [lon, lat]));
+    const features = Array.from(
+      encoder["classifyNodes"](datasetBbox(osm), ([lon, lat]) => [lon, lat]),
+    );
 
     expect(features.map(({ id }) => id)).toEqual([1]);
     expect(allNodeQuery).not.toHaveBeenCalled();
@@ -54,7 +64,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -87,7 +97,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -123,7 +133,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -159,7 +169,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -191,7 +201,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -224,7 +234,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -259,7 +269,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -291,7 +301,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -322,7 +332,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -369,7 +379,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -407,7 +417,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -449,7 +459,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -479,7 +489,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -545,7 +555,7 @@ describe("ShortbreadVtEncoder", () => {
     osm.buildIndexes();
     osm.buildSpatialIndexes();
 
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new ShortbreadVtEncoder(osm);
     const result = encoder.getTile(tile);

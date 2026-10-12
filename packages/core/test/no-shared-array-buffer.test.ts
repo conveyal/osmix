@@ -25,10 +25,11 @@ describe("without SharedArrayBuffer", () => {
     expect(osm.nodes.getById(1)?.tags?.["place"]).toBe("city");
 
     const restored = ResizeableTypedArray.from(Uint8Array, new ArrayBuffer(4));
-    expect(restored.BC).toBe(ArrayBuffer);
+    restored.push(9);
+    expect(restored.buffer).toBeInstanceOf(ArrayBuffer);
 
     const growing = new ResizeableTypedArray(Uint8Array);
-    growing.items = growing.array.length;
+    growing.pushMany(new Uint8Array(growing.capacity));
     growing.push(7);
     expect(growing.buffer).toBeInstanceOf(ArrayBuffer);
     expect(growing.at(-1)).toBe(7);

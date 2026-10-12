@@ -16,6 +16,7 @@ import {
   transfer,
 } from "osmix";
 
+import type { SavedMergeDecisions } from "./lib/merge-decisions.ts";
 import type {
   OsmixAppWorker,
   PbfUrlLoadResult,
@@ -114,15 +115,19 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
     });
   }
 
-  /** Fetch, hash, and parse a PBF once without materializing a browser File. */
+  /**
+   * Fetch, hash, and parse a PBF once without materializing a browser File. The dataset is
+   * registered as `<idPrefix><fileHash>`.
+   */
   async fromPbfUrl(
     url: string,
     options: Partial<OsmFromPbfOptions> = {},
     signal?: AbortSignal,
+    idPrefix = "",
   ): Promise<PbfUrlLoadResult> {
     return this.runWithWorker(
       async (worker) => {
-        const result = await worker.fromPbfUrl({ url, options });
+        const result = await worker.fromPbfUrl({ url, options, idPrefix });
         await this.populateOtherWorkers(worker, result.info.id);
         return result;
       },
@@ -157,13 +162,14 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
   }
 
   /**
-   * Load an Osm from IndexedDB by storage ID and register it in workers.
-   * Builds spatial indexes automatically after loading.
+   * Load an Osm from IndexedDB by storage ID and register it in workers under `targetId`
+   * (default: the stored file hash). Builds spatial indexes automatically after loading.
    * Returns the entry and info if found, null otherwise.
    */
   async loadFromStorage(
     osmId: OsmId,
     signal?: AbortSignal,
+    targetId?: string,
   ): Promise<{
     entry: StoredOsmEntry;
     info: OsmInfo;
@@ -171,16 +177,16 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
     const storageId = this.getId(osmId);
     const result = await this.runWithWorker(
       async (worker) => {
-        const osmEntry = await worker.loadFromStorage(storageId);
+        const osmEntry = await worker.loadFromStorage(storageId, true, targetId);
         if (!osmEntry) return null;
-        await this.populateOtherWorkers(worker, osmEntry.entry.fileHash);
+        await this.populateOtherWorkers(worker, osmEntry.info.id);
         return osmEntry;
       },
       { lane: "control", retry: "never", signal },
     );
     if (result) {
-      this.storageRecoveryIds.set(result.entry.fileHash, storageId);
-      this.registerDatasetForRecovery(result.entry.fileHash);
+      this.storageRecoveryIds.set(result.info.id, storageId);
+      this.registerDatasetForRecovery(result.info.id);
     }
     return result;
   }
@@ -196,6 +202,14 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
     this.storageRecoveryIds.delete(from);
     if (storageId) this.storageRecoveryIds.set(toId, storageId);
     await super.rename(from, toId);
+  }
+
+  override async copy(fromId: OsmId, toId: string): Promise<void> {
+    const from = this.getId(fromId);
+    await super.copy(from, toId);
+    const storageId = this.storageRecoveryIds.get(from);
+    if (storageId) this.storageRecoveryIds.set(toId, storageId);
+    else this.storageRecoveryIds.delete(toId);
   }
 
   protected override async recoverDataset(
@@ -222,6 +236,27 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
   /**
    * Delete a stored Osm entry from IndexedDB.
    */
+  getSavedMergeDecisions(key: string): Promise<SavedMergeDecisions | null> {
+    return this.runWithWorker((worker) => worker.getSavedMergeDecisions(key), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  saveMergeDecisions(saved: SavedMergeDecisions): Promise<void> {
+    return this.runWithWorker((worker) => worker.saveMergeDecisions(saved), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  deleteSavedMergeDecisions(key: string): Promise<void> {
+    return this.runWithWorker((worker) => worker.deleteSavedMergeDecisions(key), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
   deleteStoredOsm(id: string): Promise<void> {
     return this.runWithWorker((worker) => worker.deleteStoredOsm(id), {
       lane: "control",

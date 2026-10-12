@@ -1,55 +1,52 @@
 /**
- * @osmix/change - OSM changeset management and merge workflows.
+ * @osmix/change - Plan and apply merges of OpenStreetMap datasets.
  *
- * Provides tools for building, inspecting, and applying OpenStreetMap changesets
- * on top of `@osmix/core` datasets. Supports deduplication, overlap reconciliation,
- * intersection creation, and full merge pipelines.
+ * A merge is planned once: every change is a proposal grouped by imported feature, decided,
+ * then applied in a single build and validated for routing integrity.
  *
  * Key capabilities:
- * - **Changesets**: Track creates, modifies, and deletes with origin metadata.
- * - **Deduplication**: Remove coincident nodes or overlapping ways.
- * - **Intersections**: Create intersection nodes where ways cross.
- * - **Merging**: Combine base and patch datasets with configurable options.
- * - **Statistics**: Generate summary stats and OSC-friendly XML fragments.
+ * - **Plans**: `planMerge`, `setMergePlanDecisions`, `applyPlan`, `generateMergePlanOsc`.
+ * - **One call**: `merge` plans and applies with the Merge app's defaults.
+ * - **Matching**: `discoverConflationCandidates` finds nearby base features for imported ones.
+ * - **Within one dataset**: `planWithinDatasetDeduplication` finds duplicates to remove.
  *
  * @example
  * ```ts
- * import { OsmChangeset, applyChangesToOsm, merge } from "@osmix/change"
+ * import { applyPlan, merge, planMerge, setMergePlanDecisions } from "@osmix/change"
  *
- * // Manual changeset workflow
- * const changeset = new OsmChangeset(baseOsm)
- * changeset.generateDirectChanges(patchOsm)
- * changeset.deduplicateNodes(patchOsm.nodes)
- * const merged = applyChangesToOsm(changeset)
+ * const merged = await merge(baseOsm, patchOsm)
  *
- * // Or use the high-level merge function
- * const result = merge(baseOsm, patchOsm, {
- *   directMerge: true,
- *   deduplicateNodes: true,
- * })
+ * const plan = planMerge(baseOsm, patchOsm, { mergeIdenticalPoints: false })
+ * setMergePlanDecisions(plan, [{ proposalId: "exact:n-1>n1", action: "accept" }])
+ * const { osm } = applyPlan(plan)
  * ```
  *
  * @module @osmix/change
  */
 
 export * from "./apply-changeset.ts";
+export { ChangeRecordTable } from "./change-records.ts";
 export * from "./changeset.ts";
-export {
-  buildConflationActionDecision,
-  buildConflationBulkDecisionResult,
-  buildConflationSourceDecision,
-  conflationEffectiveStatus,
-  discoverConflationCandidates,
-  filterConflationCandidates,
-  generateConflationApplicationChangeset,
-  generateConflationArtifacts,
-  generateConflationChangeset,
-  resolveConflationActions,
-  summarizeConflationCandidates,
-  validateConflationDecisions,
-} from "./conflation.ts";
-export * from "./generate-changeset.ts";
+export { discoverConflationCandidates } from "./conflation.ts";
 export * from "./merge.ts";
 export * from "./osc.ts";
+export {
+  applyPlan,
+  generateMergePlanOsc,
+  getMergePlanCandidate,
+  getMergePlanChoices,
+  type MergePlanHooks,
+  type MergePlanResult,
+  pickNearestMergePlanDecisions,
+  planMerge,
+  proposalTagChanges,
+  setMergePlanDecisions,
+} from "./plan/plan.ts";
+export type { PlanTagChange, PlanTagChanges } from "./plan/tag-changes.ts";
+export type { PlanIntegrityEntity, PlanIntegrityIssue } from "./integrity.ts";
+export { PLAN_CHOICE_GROUPS, type PlanChoiceGroup, type PlanChoices } from "./plan/choices.ts";
+export { planWithinDatasetDeduplication } from "./plan/deduplication.ts";
+export { MergePlanDecisionConflictError } from "./plan/decision-conflict.ts";
+export * from "./plan/types.ts";
 export * from "./types.ts";
 export * from "./utils.ts";

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
 import { OsmChangeset } from "../src/changeset.ts";
-import { generateChangeset } from "../src/generate-changeset.ts";
+import { stagedChanges } from "./helpers/changes.ts";
 
 function dataset(id: string, nodes: OsmNode[], ways: OsmWay[] = [], relations: OsmRelation[] = []) {
   const osm = new Osm({ id });
@@ -17,7 +17,7 @@ function dataset(id: string, nodes: OsmNode[], ways: OsmWay[] = [], relations: O
 }
 
 function reconcile(base: Osm, patch: Osm) {
-  return generateChangeset(base, patch, { directMerge: true, deduplicateNodes: true }, () => {});
+  return stagedChanges(base, patch, { directMerge: true, deduplicateNodes: true });
 }
 
 describe("exact node replacement groups", () => {

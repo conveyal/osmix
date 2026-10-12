@@ -1,0 +1,584 @@
+/**
+ * Views of a live merge plan for the worker's paged, serializable API: an overview, filtered
+ * feature pages, one feature's evidence, and bulk decisions. `plan-tiles.ts` draws the map.
+ */
+import {
+  getMergePlanCandidate,
+  getMergePlanChoices,
+  type MergePlan,
+  type OsmConflationCandidate,
+  type OsmConflationOutcomeFeature,
+  type OsmConflationOutcomeReport,
+  type OsmConflationTagOutcome,
+  type OsmConflationUncopiedTagFeature,
+  PLAN_OUTCOME_PRIORITY,
+  pickNearestMergePlanDecisions,
+  type PlanChoiceGroup,
+  type PlanChoices,
+  type PlanDecision,
+  type PlanFeature,
+  type PlanOutcome,
+  type PlanProposal,
+  type PlanProposalStatus,
+  type PlanIntegrityIssue,
+  type PlanTagChanges,
+  proposalTagChanges,
+} from "@osmix/change";
+import type { Osm } from "@osmix/core";
+import type { LonLat, OsmTags } from "@osmix/types";
+
+/** A tag's matching outcome, with a count in place of its list of values not copied. */
+export type MergePlanTagOutcome = Omit<OsmConflationTagOutcome, "uncopied"> & {
+  uncopiedFeatures: number;
+};
+
+/**
+ * The matching outcome without its per-feature lists, which can hold an entry for every imported
+ * feature: read those a page at a time with `getMergeMatchingPage` and
+ * `getMergeUncopiedTagPage`.
+ */
+export type MergePlanMatchingOutcome = Omit<OsmConflationOutcomeReport, "features" | "tags"> & {
+  tags: MergePlanTagOutcome[];
+  /** Features whose matching removes the imported way. */
+  wayRemovalFeatures: number;
+};
+
+/** Everything about a plan except its features, for headers and summaries. */
+export interface MergePlanOverview {
+  inputs: MergePlan["inputs"];
+  options: MergePlan["options"];
+  idRemap: MergePlan["idRemap"];
+  summary: MergePlan["summary"];
+  diagnostics: Omit<MergePlan["diagnostics"], "integrity"> & {
+    /**
+     * New routing-integrity problems, each with the key of the imported feature it concerns:
+     * the first entity it names that an imported feature owns (the feature itself, or one of
+     * its vertices). Absent when it names only base entities.
+     */
+    integrity: (PlanIntegrityIssue & { featureKey?: string })[];
+  };
+  matching?: {
+    candidates: NonNullable<MergePlan["matching"]>["candidates"];
+    outcome: MergePlanMatchingOutcome;
+  };
+  decisions: PlanDecision[];
+  staleDecisions: string[];
+  featureCount: number;
+  /** Features that need a decision, by why they wait; the counts sum to that outcome's. */
+  choices: Record<PlanChoiceGroup, number>;
+}
+
+/** Which features a page shows. Every set field must match. */
+export interface MergePlanFilter {
+  outcome?: PlanOutcome;
+  /** Features with at least one proposal of this kind. */
+  kind?: PlanProposal["kind"];
+  /** Features with at least one proposal with this status. */
+  status?: PlanProposalStatus;
+  /** Features with at least one proposal with this reason. */
+  reason?: string;
+  /** Features that wait for a decision for this reason, and only their proposals in it. */
+  group?: PlanChoiceGroup;
+}
+
+/** A feature row: the feature, its proposals, and a label from the patch's tags. */
+export interface MergePlanFeatureView extends PlanFeature {
+  name?: string;
+  tags?: OsmTags;
+  proposals: PlanProposal[];
+  /**
+   * What each proposal that changes existing tags does to them, by proposal ID, whether or not
+   * it is included yet. Proposals that change none (added features, connections) are absent.
+   */
+  tagChanges: Record<string, PlanTagChanges>;
+}
+
+export interface MergePlanPage {
+  features: MergePlanFeatureView[];
+  total: number;
+  totalPages: number;
+}
+
+/** One feature with the evidence behind its matching proposals and the geometry involved. */
+export interface MergePlanFeatureDetail extends MergePlanFeatureView {
+  candidates: Record<string, OsmConflationCandidate>;
+  /** The imported feature's coordinates, as loaded. */
+  coordinates: LonLat[];
+  /** Coordinates of each base entity a proposal targets, by proposal ID. */
+  targets: Record<string, LonLat[]>;
+  /** Coordinates of each base way a way replacement deletes, by proposal ID (MP-R2). */
+  replaces: Record<string, LonLat[][]>;
+}
+
+export interface MergePlanBulkRequest {
+  /**
+   * `pick-nearest` includes the clearly nearest candidate of each choice the filter shows and
+   * leaves out its rivals, as a person's decisions (MP-M6's margin).
+   */
+  action: "accept" | "reject" | "clear" | "pick-nearest";
+  filter: MergePlanFilter;
+}
+
+/** What a bulk request does to the features its filter shows, counted in features. */
+export interface MergePlanBulkCounts {
+  /** Features with at least one decision the request adds, replaces, or clears. */
+  changed: number;
+  /**
+   * Features that still wait for a decision afterwards: removals, choices between competing
+   * proposals, and proposals the request leaves alone.
+   */
+  waiting: number;
+}
+
+export interface MergePlanBulkResult extends MergePlanBulkCounts {
+  overview: MergePlanOverview;
+}
+
+/** What each bulk action would do to the features a filter shows, before choosing one. */
+export type MergePlanBulkPreview = Record<MergePlanBulkRequest["action"], MergePlanBulkCounts>;
+
+/** Which matching outcome features a page shows. */
+/**
+ * Which matching outcomes a page lists: work still needing a person (`unresolved`), sources with
+ * no base feature within the matching radius (`unmatched`), skipped ones, removals, or all.
+ */
+export type MergeMatchingFilter = "unresolved" | "unmatched" | "skipped" | "way-removal" | "all";
+
+export interface MergeMatchingPage {
+  features: OsmConflationOutcomeFeature[];
+  total: number;
+  totalPages: number;
+}
+
+export interface MergeUncopiedTagPage {
+  features: OsmConflationUncopiedTagFeature[];
+  total: number;
+  totalPages: number;
+}
+
+const DIRECT_KINDS = new Set<PlanProposal["kind"]>(["add", "same-id-replace"]);
+
+export function planOverview(plan: MergePlan): MergePlanOverview {
+  return structuredClone({
+    inputs: plan.inputs,
+    options: plan.options,
+    idRemap: plan.idRemap,
+    summary: plan.summary,
+    diagnostics: { ...plan.diagnostics, integrity: integrityOf(plan) },
+    ...(plan.matching
+      ? {
+          matching: {
+            candidates: plan.matching.candidates,
+            outcome: matchingOutcome(plan.matching.outcome),
+          },
+        }
+      : {}),
+    decisions: [...(plan.options.decisions ?? [])],
+    staleDecisions: plan.staleDecisions,
+    featureCount: plan.features.length,
+    choices: choicesOf(plan).counts,
+  });
+}
+
+const cachedIntegrity = new WeakMap<
+  MergePlan["diagnostics"],
+  MergePlanOverview["diagnostics"]["integrity"]
+>();
+
+/**
+ * The plan's integrity issues with the imported feature each concerns: the first entity it names
+ * that a feature is, or has as a vertex. Computed once per planned state.
+ */
+function integrityOf(plan: MergePlan) {
+  const cached = cachedIntegrity.get(plan.diagnostics);
+  if (cached) return cached;
+  const named = new Set(
+    plan.diagnostics.integrity.flatMap(({ entities }) => entities.map(entityKeyOf)),
+  );
+  const owner = new Map<string, string>();
+  for (const feature of plan.features) {
+    const own = entityKeyOf(feature);
+    if (named.has(own) && !owner.has(own)) owner.set(own, feature.key);
+    for (const id of feature.vertexIds ?? []) {
+      const vertex = entityKeyOf({ type: "node", id });
+      if (named.has(vertex) && !owner.has(vertex)) owner.set(vertex, feature.key);
+    }
+  }
+  const integrity = plan.diagnostics.integrity.map((issue: PlanIntegrityIssue) => {
+    const featureKey = issue.entities.map((entity) => owner.get(entityKeyOf(entity))).find(Boolean);
+    return featureKey ? { ...issue, featureKey } : issue;
+  });
+  cachedIntegrity.set(plan.diagnostics, integrity);
+  return integrity;
+}
+
+const entityKeyOf = ({ type, id }: { type: string; id: number }) => `${type}:${id}`;
+
+const cachedChoices = new WeakMap<MergePlan["summary"], PlanChoices>();
+
+/** The plan's choice groups, computed once per planned state (each replan makes a new summary). */
+export function choicesOf(plan: MergePlan) {
+  let choices = cachedChoices.get(plan.summary);
+  if (!choices) {
+    choices = getMergePlanChoices(plan);
+    cachedChoices.set(plan.summary, choices);
+  }
+  return choices;
+}
+
+function matchingOutcome(report: OsmConflationOutcomeReport): MergePlanMatchingOutcome {
+  const { features, tags, ...rest } = report;
+  return {
+    ...rest,
+    tags: tags.map(({ uncopied, ...tag }) => ({ ...tag, uncopiedFeatures: uncopied.length })),
+    wayRemovalFeatures: features.filter((feature) => feature.wayRemoval).length,
+  };
+}
+
+function pageOf<T>(items: readonly T[], page: number, pageSize: number) {
+  const totalPages = Math.ceil(items.length / pageSize);
+  return {
+    features: items.slice(page * pageSize, (page + 1) * pageSize),
+    total: items.length,
+    totalPages,
+  };
+}
+
+function matchesMatchingFilter(feature: OsmConflationOutcomeFeature, filter: MergeMatchingFilter) {
+  switch (filter) {
+    case "unresolved":
+      return feature.unresolved !== null && feature.unresolved !== "unmatched";
+    case "unmatched":
+      return feature.unresolved === "unmatched";
+    case "skipped":
+      return feature.skipped;
+    case "way-removal":
+      return feature.wayRemoval !== undefined;
+    case "all":
+      return true;
+  }
+}
+
+/** One page of the matching outcome's features that match `filter`, in report order. */
+export function matchingPage(
+  report: OsmConflationOutcomeReport,
+  filter: MergeMatchingFilter,
+  page: number,
+  pageSize: number,
+): MergeMatchingPage {
+  const features =
+    filter === "all"
+      ? report.features
+      : report.features.filter((feature) => matchesMatchingFilter(feature, filter));
+  return structuredClone(pageOf(features, page, pageSize));
+}
+
+/** One page of the imported features whose value for tag `key` was not copied. */
+export function uncopiedTagPage(
+  report: OsmConflationOutcomeReport,
+  key: string,
+  page: number,
+  pageSize: number,
+): MergeUncopiedTagPage {
+  const tag = report.tags.find((candidate) => candidate.key === key);
+  if (!tag) throw Error(`No tag ${key} in this matching outcome`);
+  return structuredClone(pageOf(tag.uncopied, page, pageSize));
+}
+
+function proposalsOf(plan: MergePlan, feature: PlanFeature) {
+  return feature.proposalIds.map((id) => plan.proposals.get(id)!);
+}
+
+function matchesFilter(plan: MergePlan, feature: PlanFeature, filter: MergePlanFilter) {
+  if (filter.outcome && feature.outcome !== filter.outcome) return false;
+  if (filter.group && choicesOf(plan).features.get(feature.key) !== filter.group) return false;
+  if (!filter.kind && !filter.status && !filter.reason) return true;
+  return proposalsOf(plan, feature).some(
+    (proposal) =>
+      (!filter.kind || proposal.kind === filter.kind) &&
+      (!filter.status || proposal.status === filter.status) &&
+      (!filter.reason || proposal.reasons.includes(filter.reason)),
+  );
+}
+
+/** The feature as loaded, by its original patch ID. */
+function patchEntity(patch: Osm, feature: PlanFeature) {
+  if (feature.type === "node") return patch.nodes.getById(feature.originalId);
+  if (feature.type === "way") return patch.ways.getById(feature.originalId);
+  return patch.relations.getById(feature.originalId);
+}
+
+function featureView(plan: MergePlan, patch: Osm, feature: PlanFeature): MergePlanFeatureView {
+  const tags = patchEntity(patch, feature)?.tags;
+  const name = tags?.["name"];
+  const proposals = proposalsOf(plan, feature);
+  const tagChanges: Record<string, PlanTagChanges> = {};
+  for (const proposal of proposals) {
+    const changes = proposalTagChanges(plan, proposal.id);
+    if (changes && (changes.changes.length > 0 || changes.entity === null)) {
+      tagChanges[proposal.id] = changes;
+    }
+  }
+  return structuredClone({
+    ...feature,
+    ...(tags ? { tags } : {}),
+    ...(name != null ? { name: String(name) } : {}),
+    proposals,
+    tagChanges,
+  });
+}
+
+/** Features that match `filter`: decisions first, then by outcome, then in patch order. */
+function filteredFeatures(plan: MergePlan, filter: MergePlanFilter) {
+  const rank = (feature: PlanFeature) => PLAN_OUTCOME_PRIORITY.indexOf(feature.outcome);
+  return plan.features
+    .filter((feature) => matchesFilter(plan, feature, filter))
+    .toSorted((a, b) => rank(a) - rank(b));
+}
+
+/** `patch` is the patch as loaded; features are found by their original IDs. */
+export function planPage(
+  plan: MergePlan,
+  patch: Osm,
+  filter: MergePlanFilter,
+  page: number,
+  pageSize: number,
+): MergePlanPage {
+  const features = filteredFeatures(plan, filter);
+  return {
+    features: features
+      .slice(page * pageSize, (page + 1) * pageSize)
+      .map((feature) => featureView(plan, patch, feature)),
+    total: features.length,
+    totalPages: Math.ceil(features.length / pageSize),
+  };
+}
+
+/** The page `featureKey` is on under `filter`, or null when the filter hides it. */
+export function planFeaturePage(
+  plan: MergePlan,
+  filter: MergePlanFilter,
+  featureKey: string,
+  pageSize: number,
+): number | null {
+  const index = filteredFeatures(plan, filter).findIndex(({ key }) => key === featureKey);
+  return index === -1 ? null : Math.floor(index / pageSize);
+}
+
+function coordinates(osm: Osm, type: PlanFeature["type"], id: number): LonLat[] {
+  if (type === "node") {
+    const node = osm.nodes.getById(id);
+    return node ? [[node.lon, node.lat]] : [];
+  }
+  if (type === "way") {
+    const way = osm.ways.getById(id);
+    return (way?.refs ?? []).flatMap((ref) => {
+      const node = osm.nodes.getById(ref);
+      return node ? [[node.lon, node.lat] as LonLat] : [];
+    });
+  }
+  return [];
+}
+
+export function planFeatureDetail(
+  plan: MergePlan,
+  base: Osm,
+  patch: Osm,
+  featureKey: string,
+): MergePlanFeatureDetail {
+  const feature = plan.features.find(({ key }) => key === featureKey);
+  if (!feature) throw Error(`No feature ${featureKey} in this merge plan`);
+  const candidates: Record<string, OsmConflationCandidate> = {};
+  const targets: Record<string, LonLat[]> = {};
+  const replaces: Record<string, LonLat[][]> = {};
+  for (const proposal of proposalsOf(plan, feature)) {
+    const candidate = getMergePlanCandidate(plan, proposal.id);
+    if (candidate) candidates[proposal.id] = structuredClone(candidate);
+    if ("target" in proposal) {
+      targets[proposal.id] = coordinates(base, proposal.target.type, proposal.target.id);
+    }
+    if (proposal.kind === "replace-way") {
+      replaces[proposal.id] = proposal.replaces.map(({ type, id }) => coordinates(base, type, id));
+    }
+  }
+  return {
+    ...featureView(plan, patch, feature),
+    candidates,
+    coordinates: coordinates(patch, feature.type, feature.originalId),
+    targets,
+    replaces,
+  };
+}
+
+/**
+ * The proposals including `proposal` would leave out: its alternatives and competitors (MP-M5),
+ * and what it and a way replacement exclude (MP-R2).
+ */
+function excludedBy(proposal: PlanProposal): readonly string[] {
+  const choices =
+    "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
+  return [...choices, ...(proposal.excludes ?? [])];
+}
+
+type Decisions = ReadonlyMap<string, PlanDecision["action"]>;
+
+/**
+ * A proposal's decision: a person's (from `decisions`, or on another member of its way
+ * replacement set, MP-R2), else the automation level's.
+ */
+function decisionOf(plan: MergePlan, id: string, decisions: Decisions) {
+  const own = decisions.get(id);
+  if (own) return own;
+  const proposal = plan.proposals.get(id);
+  const together = proposal?.kind === "replace-way" ? setDecision(proposal.set, decisions) : null;
+  if (together) return together;
+  return proposal?.automated ? proposal.decision : undefined;
+}
+
+/** A person's decision on any member of a way replacement set. */
+function setDecision(set: readonly string[], decisions: Decisions) {
+  for (const id of set) {
+    const decision = decisions.get(id);
+    if (decision) return decision;
+  }
+  return null;
+}
+
+/** An undecided review proposal no included alternative or competitor has already left out. */
+function isWaiting(plan: MergePlan, proposal: PlanProposal, decisions: Decisions) {
+  if (proposal.status !== "review" || decisionOf(plan, proposal.id, decisions)) return false;
+  return !excludedBy(proposal).some((id) => decisionOf(plan, id, decisions) === "accept");
+}
+
+/**
+ * Whether including `proposal` needs a choice only a person can make: removal needs its own
+ * consent (MP-R1), and a proposal that excludes others needs a choice between them (MP-M5). A
+ * way replacement (MP-R2) needs one only when something it excludes is included.
+ * Blocked proposals and ones already left out are not choices.
+ */
+function needsOwnChoice(plan: MergePlan, proposal: PlanProposal, decisions: Decisions) {
+  if (proposal.kind === "remove-way") return true;
+  // A replacement leaves out what it excludes by itself, unless someone included one of those.
+  if (proposal.kind === "replace-way") {
+    return excludedBy(proposal).some((id) => decisionOf(plan, id, decisions) === "accept");
+  }
+  return excludedBy(proposal).some(
+    (id) =>
+      plan.proposals.get(id)?.status !== "blocked" && decisionOf(plan, id, decisions) !== "reject",
+  );
+}
+
+/**
+ * The decisions after a bulk request, and what it does counted in features. Accepting applies
+ * only to review proposals that need no choice of their own, never to a removal; rejecting
+ * applies to every decidable proposal; clearing removes decisions. A bulk accept or reject never
+ * replaces a person's decision; leaving out can replace the automation level's, and clearing
+ * removes only a person's. Proposals whose kind, status or reason differs from the
+ * filter's are left alone.
+ */
+export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
+  const decisions = new Map(
+    (plan.options.decisions ?? []).map((decision) => [decision.proposalId, decision.action]),
+  );
+  let changed = 0;
+  let waiting = 0;
+  const { action, filter } = request;
+  if (action === "pick-nearest") return pickNearest(plan, filter, decisions);
+  for (const feature of filteredFeatures(plan, filter)) {
+    const proposals = bulkProposals(plan, feature, filter);
+    let featureChanged = false;
+    for (const proposal of proposals) {
+      if (action === "clear") {
+        if (decisions.delete(proposal.id)) featureChanged = true;
+        continue;
+      }
+      if (decisions.has(proposal.id)) continue;
+      // A set member decided already decides this one (MP-R2).
+      if (proposal.kind === "replace-way" && setDecision(proposal.set, decisions)) continue;
+      if (action === "accept") {
+        if (proposal.status !== "review" || !isWaiting(plan, proposal, decisions)) continue;
+        if (needsOwnChoice(plan, proposal, decisions)) continue;
+      }
+      decisions.set(proposal.id, action);
+      featureChanged = true;
+    }
+    if (featureChanged) changed++;
+    if (proposals.some((proposal) => isWaiting(plan, proposal, decisions))) waiting++;
+  }
+  return {
+    decisions: [...decisions].map(([proposalId, action]) => ({ proposalId, action })),
+    changed,
+    waiting,
+  };
+}
+
+/**
+ * Pick the clearly nearest candidate of each choice the filter shows. Rivals can belong to
+ * features the filter does not show, and are left out all the same.
+ */
+function pickNearest(
+  plan: MergePlan,
+  filter: MergePlanFilter,
+  decisions: Map<string, PlanDecision["action"]>,
+) {
+  const shown = filteredFeatures(plan, filter);
+  const ids = shown.flatMap((feature) => bulkProposals(plan, feature, filter).map(({ id }) => id));
+  const changed = new Set<string>();
+  for (const { proposalId, action } of pickNearestMergePlanDecisions(plan, ids)) {
+    if (decisions.has(proposalId)) continue;
+    decisions.set(proposalId, action);
+    changed.add(plan.proposals.get(proposalId)!.feature);
+  }
+  const waiting = shown.filter((feature) =>
+    bulkProposals(plan, feature, filter).some((proposal) => isWaiting(plan, proposal, decisions)),
+  ).length;
+  return {
+    decisions: [...decisions].map(([proposalId, action]) => ({ proposalId, action })),
+    changed: changed.size,
+    waiting,
+  };
+}
+
+/** A feature's decidable proposals that match the filter's kind, status, reason and group. */
+function bulkProposals(plan: MergePlan, feature: PlanFeature, filter: MergePlanFilter) {
+  const groups = filter.group ? choicesOf(plan).proposals : undefined;
+  return proposalsOf(plan, feature).filter(
+    (proposal) =>
+      !DIRECT_KINDS.has(proposal.kind) &&
+      proposal.status !== "blocked" &&
+      (!groups || groups.get(proposal.id) === filter.group) &&
+      (!filter.kind || proposal.kind === filter.kind) &&
+      (!filter.status || proposal.status === filter.status) &&
+      (!filter.reason || proposal.reasons.includes(filter.reason)),
+  );
+}
+
+/**
+ * Features `filter` shows that still wait for a decision in the plan as it stands, counting
+ * proposals a replan created after the decisions that caused it.
+ */
+export function waitingFeatures(plan: MergePlan, filter: MergePlanFilter) {
+  const decisions = new Map(
+    (plan.options.decisions ?? []).map((decision) => [decision.proposalId, decision.action]),
+  );
+  let waiting = 0;
+  for (const feature of filteredFeatures(plan, filter)) {
+    const proposals = bulkProposals(plan, feature, filter);
+    if (proposals.some((proposal) => isWaiting(plan, proposal, decisions))) waiting++;
+  }
+  return waiting;
+}
+
+/** What each bulk action would do to the features `filter` shows. */
+export function bulkPreview(plan: MergePlan, filter: MergePlanFilter): MergePlanBulkPreview {
+  const counts = (action: MergePlanBulkRequest["action"]) => {
+    const { changed, waiting } = bulkDecisions(plan, { action, filter });
+    return { changed, waiting };
+  };
+  return {
+    accept: counts("accept"),
+    reject: counts("reject"),
+    clear: counts("clear"),
+    "pick-nearest": counts("pick-nearest"),
+  };
+}

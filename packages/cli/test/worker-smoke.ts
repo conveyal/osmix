@@ -22,6 +22,7 @@ try {
   try {
     const info = await renderer.loadPbfFile(fixturePath, "worker-smoke");
     const bbox = info.bbox;
+    if (bbox === null) throw Error("worker-smoke fixture contains no nodes");
     const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2] as const;
     const [tileX, tileY] = pointToTileFraction(center[0], center[1], 15);
     const x = Math.floor(tileX);

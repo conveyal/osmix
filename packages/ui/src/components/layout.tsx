@@ -1,42 +1,59 @@
-import { useAtom } from "jotai";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { cn } from "../lib/utils.ts";
-import { sidebarIsOpenAtom } from "../state/layout.ts";
+import { setToastAnchor } from "../state/layout.ts";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarInset,
+  SidebarRail,
+} from "./ui/sidebar.tsx";
 
+/**
+ * The row under the nav (and the small-window banner): `AppSidebar` then `MapContent`. The
+ * sidebar is positioned inside this row, so it starts wherever the row does.
+ */
 export function Main({ children }: { children: ReactNode }) {
-  return <div className="flex flex-row grow h-full overflow-hidden">{children}</div>;
-}
-
-export function Sidebar({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useAtom(sidebarIsOpenAtom);
   return (
-    <div className="flex h-full min-h-0 flex-row z-30 group/sidebar relative">
-      <div
-        className={cn(
-          "flex h-full min-h-0 flex-col w-3 overflow-hidden bg-muted",
-          isOpen && "w-xs md:w-sm lg:w-md xl:w-lg",
-        )}
-      >
-        {children}
-      </div>
-      <button
-        type="button"
-        onClick={() => setIsOpen((o) => !o)}
-        className={cn(
-          "absolute h-full right-[-3] w-3 flex items-center justify-center cursor-e-resize",
-          "bg-muted hover:bg-accent",
-          isOpen && "w-2 cursor-w-resize right-0",
-        )}
-        aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
-      >
-        {isOpen ? <ChevronLeft className="size-2" /> : <ChevronRight className="size-3" />}
-      </button>
+    <div data-slot="main" className="relative flex min-h-0 w-full flex-1 flex-row overflow-hidden">
+      {children}
     </div>
   );
 }
 
+/**
+ * The app sidebar: shadcn's `Sidebar`, below the nav, collapsing offcanvas (nav trigger, the
+ * edge rail, or Cmd/Ctrl+B). Children scroll in one `ScrollArea`, flush to the sidebar edges:
+ * they are `SidebarSection`s (or `Step`s), which own the inset and the dividers between them.
+ * `footer` stays pinned below the scroll.
+ */
+export function AppSidebar({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+  return (
+    <Sidebar
+      collapsible="offcanvas"
+      // Anchored to `Main`, not the viewport, so content above the row never sits under it.
+      className="absolute h-full"
+    >
+      <SidebarContent>{children}</SidebarContent>
+      {footer ? <SidebarFooter className="gap-0 p-0">{footer}</SidebarFooter> : null}
+      <SidebarRail />
+    </Sidebar>
+  );
+}
+
+/**
+ * The map side of the page; fills whatever the sidebar leaves. A strip across its top anchors
+ * the toast region (`setToastAnchor`), above the map overlay and below modal layers.
+ */
 export function MapContent({ children }: { children: ReactNode }) {
-  return <div className="relative grow-3 bg-muted-foreground">{children}</div>;
+  return (
+    <SidebarInset className="min-h-0 bg-muted">
+      {children}
+      <div
+        ref={setToastAnchor}
+        data-slot="toast-anchor"
+        className="pointer-events-none absolute inset-x-0 top-0 z-30"
+      />
+    </SidebarInset>
+  );
 }

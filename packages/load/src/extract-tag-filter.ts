@@ -12,16 +12,27 @@ export interface ExtractTagFilterRule {
   value?: string;
 }
 
-/** Per-entity-type tag filter rule lists. */
+/**
+ * Per-entity-type tag filter rule lists.
+ *
+ * Node rules select standalone nodes only: loads keep every node that a kept way or kept
+ * relation references, whatever its tags.
+ */
 export interface ExtractTagFilterRules {
   nodes: ExtractTagFilterRule[];
   ways: ExtractTagFilterRule[];
   relations: ExtractTagFilterRule[];
 }
 
-/** Conveyal default extract tag filters (transit / RO oriented). */
+/**
+ * Conveyal default extract tag filters, for building R5 transit networks.
+ *
+ * The only standalone nodes R5 reads are park and ride nodes. The node tags R5 reads on street
+ * vertices (`highway=traffic_signals`, `entrance=emergency`, `access=no` with `foot` and
+ * `bicycle`, `kerb=raised`) are kept because nodes on kept ways are always kept.
+ */
 export const CONVEYAL_EXTRACT_TAG_FILTERS: ExtractTagFilterRules = {
-  nodes: [],
+  nodes: [{ key: "park_ride" }],
   ways: [
     { key: "highway" },
     { key: "public_transport", value: "platform" },

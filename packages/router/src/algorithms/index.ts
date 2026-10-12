@@ -4,7 +4,7 @@
  * Provides three algorithms:
  * - `dijkstra`: Optimal shortest path, explores all directions equally.
  * - `astar`: Optimal with heuristic guidance, faster for point-to-point.
- * - `bidirectional`: Fast BFS from both ends, finds *a* path (not always optimal).
+ * - `bidirectional`: Optimal Dijkstra from both ends; needs `context.reverseGraph`.
  *
  * @module
  */

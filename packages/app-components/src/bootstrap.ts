@@ -1,10 +1,10 @@
 import {
   createOsmixAppRemote,
   createThrottledProgressLogger,
-  Log,
   type OsmixAppRemote,
   type OsmixAppRemoteOptions,
   remoteAtom,
+  Tasks,
 } from "@osmix/app-core";
 import { createStore } from "jotai";
 
@@ -21,7 +21,7 @@ export interface OsmixAppRuntime {
 /**
  * Create the runtime every Osmix app needs before it renders: a jotai store, the worker remote
  * (set on `remoteAtom`), the MapLibre tile protocols and the MapLibre worker URL. Progress
- * messages go to the shared `Log` unless `onProgress` is given.
+ * messages go to the shared `Tasks` store unless `onProgress` is given.
  *
  * Deliberately stops there. Apps subscribe to atoms, expose the remote for tests, and render
  * with `OsmixAppShell` themselves, so app-specific wiring stays in the app.
@@ -31,7 +31,7 @@ export async function createOsmixAppRuntime(
 ): Promise<OsmixAppRuntime> {
   const store = createStore();
   const remote = await createOsmixAppRemote({
-    onProgress: createThrottledProgressLogger(Log),
+    onProgress: createThrottledProgressLogger(Tasks),
     ...options,
   });
   store.set(remoteAtom, remote);

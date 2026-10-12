@@ -1,0 +1,238 @@
+import { Radio, RadioLabel, StatusDot, type StatusDotStatus, useTaskLock } from "@osmix/ui";
+import { useAtomValue } from "jotai";
+import type { PlanConnectionRivalry, PlanDecision, PlanProposal, PlanTagChanges } from "osmix";
+import { useId } from "react";
+
+import {
+  AUTOMATION_LABEL,
+  PROPOSAL_KIND_LABEL,
+  isDecidable,
+  planReasonLabel,
+  proposalStatusText,
+} from "../lib/merge-plan-workflow";
+import { planOverviewAtom, planPendingChoicesAtom } from "../state/merge-plan";
+import { tagChangesSummary } from "./plan-tag-changes";
+
+const EFFECT_DOT: Record<PlanProposal["effect"], StatusDotStatus> = {
+  applied: "ok",
+  skipped: "warn",
+  blocked: "error",
+  "needs-decision": "warn",
+};
+
+type Choice = PlanDecision["action"] | "rule";
+
+const ENTITY_WORD = { node: "point", way: "way", relation: "relation" } as const;
+
+/**
+ * The imported entity a matching proposal starts from, by its patch ID, from the proposal ID
+ * (`connect:n18752>n-27` → "imported point 18752"). One way's row can hold several points'
+ * proposals to the same base node, so each names its point.
+ */
+function importedSource({
+  id,
+  source,
+}: {
+  id: string;
+  source: { type: keyof typeof ENTITY_WORD };
+}) {
+  const token = id.slice(id.indexOf(":") + 2, id.indexOf(">"));
+  return `imported ${ENTITY_WORD[source.type]} ${token}`;
+}
+
+const TOKEN_TYPE = { n: "node", w: "way", r: "relation" } as const;
+
+/** The imported source a matching proposal ID names: `connect:n18731>n1` → "imported point 18731". */
+function importedSourceOfId(id: string) {
+  const token = id.slice(id.indexOf(":") + 1, id.indexOf(">"));
+  const type = TOKEN_TYPE[token.charAt(0) as keyof typeof TOKEN_TYPE] ?? "node";
+  return importedSource({ id, source: { type } });
+}
+
+/**
+ * Why a connection competes with a rival for its base node (MP-M5), in words: the two points
+ * are on one imported way, which connecting both would fold onto one point, or they give a key
+ * different values, and each connection writes its point's values to the base node.
+ */
+function rivalryText(rivalId: string, { sharedWay, conflictingKeys }: PlanConnectionRivalry) {
+  const rival = importedSourceOfId(rivalId);
+  const named = rival.charAt(0).toUpperCase() + rival.slice(1);
+  const reasons = [
+    ...(sharedWay === undefined
+      ? []
+      : [
+          `is also on imported way ${sharedWay}; connecting both would fold that way onto one point`,
+        ]),
+    ...(conflictingKeys === undefined
+      ? []
+      : [`gives ${conflictingKeys.join(", ")} a different value; the base node takes one value`]),
+  ];
+  return `${named} ${reasons.join(", and ")}.`;
+}
+
+/**
+ * The two entities a matching proposal compares, in words: "imported point 18752 and base node
+ * -27". A connection and a copy for the same pair share their evidence.
+ */
+export function matchedPair(proposal: PlanProposal) {
+  if (!("target" in proposal) || !("source" in proposal)) return null;
+  return `${importedSource(proposal)} and base ${proposal.target.type} ${proposal.target.id}`;
+}
+
+/** What the proposal changes, in words: its kind and the entities it involves. */
+export function proposalTitle(proposal: PlanProposal) {
+  const kind = PROPOSAL_KIND_LABEL[proposal.kind];
+  if (proposal.kind === "replace-way") {
+    const ids = proposal.replaces.map(({ id }) => id).join(", ");
+    return proposal.replaces.length === 1 ? `Replace base way ${ids}` : `Replace base ways ${ids}`;
+  }
+  const target = "target" in proposal ? `base ${proposal.target.type} ${proposal.target.id}` : "";
+  if (proposal.kind === "connect") return `Connect ${importedSource(proposal)} to ${target}`;
+  if (proposal.kind === "copy-tags")
+    return `Copy tags from ${importedSource(proposal)} to ${target}`;
+  if ("target" in proposal) return `${kind} with ${target}`;
+  if ("ways" in proposal) return `${kind} with ${proposal.ways[1].type} ${proposal.ways[1].id}`;
+  return kind;
+}
+
+/**
+ * One proposal: what it does, whether it is in the plan and why, and the choice for it. An
+ * automatic proposal is included unless left out; one that needs review waits for a choice; a
+ * blocked one shows its reasons and takes no choice. A choice the automation level made shows
+ * as its rule, which a person's choice replaces.
+ */
+export function PlanProposalActions({
+  onDecide,
+  proposal,
+  tagChanges,
+}: {
+  onDecide: (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+    together?: readonly string[],
+  ) => unknown;
+  proposal: PlanProposal;
+  /** What the proposal does to tags, when it changes any. */
+  tagChanges?: PlanTagChanges | undefined;
+}) {
+  const taskLocked = useTaskLock();
+  const automation = useAtomValue(planOverviewAtom)?.options.automation ?? "recommended";
+  const pendingChoices = useAtomValue(planPendingChoicesAtom);
+  const name = useId();
+  const title = proposalTitle(proposal);
+  const decidable = isDecidable(proposal) && proposal.status !== "blocked";
+  // A choice not sent to the planner yet shows as chosen, marked as not applied.
+  const pending = pendingChoices.has(proposal.id);
+  const choice: Choice = pending
+    ? (pendingChoices.get(proposal.id) ?? "rule")
+    : proposal.automated
+      ? "rule"
+      : (proposal.decision ?? "rule");
+  const automated = proposal.automated
+    ? `${proposal.decision === "accept" ? "Include" : "Leave out"} (${AUTOMATION_LABEL[automation]})`
+    : null;
+  const choices: { value: Choice; label: string }[] =
+    proposal.status === "automatic"
+      ? [
+          { value: "rule", label: "Include (automatic)" },
+          { value: "reject", label: "Leave out" },
+        ]
+      : automated
+        ? [
+            { value: "rule", label: automated },
+            {
+              value: proposal.decision === "accept" ? "reject" : "accept",
+              label: proposal.decision === "accept" ? "Leave out" : "Include",
+            },
+          ]
+        : [
+            { value: "rule", label: "Decide later" },
+            { value: "accept", label: "Include" },
+            { value: "reject", label: "Leave out" },
+          ];
+  const alternatives = "alternatives" in proposal ? proposal.alternatives.length : 0;
+  const competitors = "competitors" in proposal ? proposal.competitors.length : 0;
+  const excludes = [
+    ...("competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : []),
+    ...(proposal.excludes ?? []),
+  ];
+  return (
+    <div className="flex flex-col gap-1" data-proposal-id={proposal.id}>
+      <div className="flex items-center gap-2">
+        <StatusDot status={EFFECT_DOT[proposal.effect]} />
+        <span className="font-medium">{title}</span>
+      </div>
+      <p className="text-muted-foreground">
+        {proposalStatusText(proposal)}
+        {proposal.automated ? ` · Decided by ${AUTOMATION_LABEL[automation]}` : null}
+        {pending ? " · Choice not applied yet" : null}
+      </p>
+      {tagChanges ? (
+        <p className="text-muted-foreground">
+          {tagChangesSummary(tagChanges, proposal.effect === "applied")}
+        </p>
+      ) : null}
+      {proposal.reasons.length > 0 ? (
+        <ul className="list-disc pl-4 text-muted-foreground">
+          {proposal.reasons.map((reason) => (
+            <li key={reason}>{planReasonLabel(reason)}</li>
+          ))}
+        </ul>
+      ) : null}
+      {proposal.kind === "replace-way" && proposal.together.length > 0 ? (
+        <p className="text-muted-foreground">
+          Decided together with imported {proposal.together.length === 1 ? "way" : "ways"}{" "}
+          {proposal.together.map(({ id }) => id).join(", ")}.
+        </p>
+      ) : null}
+      {alternatives > 0 ? (
+        <p className="text-muted-foreground">
+          {alternatives.toLocaleString()} other {alternatives === 1 ? "target is" : "targets are"}{" "}
+          possible; include at most one.
+        </p>
+      ) : null}
+      {proposal.kind === "connect" && proposal.rivalries ? (
+        <div className="text-muted-foreground">
+          <ul className="list-disc pl-4">
+            {Object.entries(proposal.rivalries).map(([rivalId, rivalry]) => (
+              <li key={rivalId}>{rivalryText(rivalId, rivalry)}</li>
+            ))}
+          </ul>
+          <p>Include at most one; including this one leaves the others out.</p>
+        </div>
+      ) : competitors > 0 && "target" in proposal ? (
+        <p className="text-muted-foreground">
+          {competitors.toLocaleString()} other imported{" "}
+          {proposal.kind === "connect"
+            ? `${competitors === 1 ? "point" : "points"} can also connect to base node ${proposal.target.id}`
+            : `${competitors === 1 ? "feature" : "features"} can also change base way ${proposal.target.id}`}
+          ; include at most one. Including this one leaves the others out.
+        </p>
+      ) : null}
+      {decidable ? (
+        <fieldset className="flex flex-wrap gap-x-3" aria-label={`Choice: ${title}`}>
+          {choices.map((option) => (
+            <RadioLabel key={option.value}>
+              <Radio
+                name={name}
+                value={option.value}
+                checked={choice === option.value}
+                disabled={taskLocked}
+                onChange={() =>
+                  void onDecide(
+                    proposal.id,
+                    option.value === "rule" ? null : option.value,
+                    excludes,
+                    proposal.kind === "replace-way" ? proposal.set : [],
+                  )
+                }
+              />
+              {option.label}
+            </RadioLabel>
+          ))}
+        </fieldset>
+      ) : null}
+    </div>
+  );
+}

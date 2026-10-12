@@ -4,7 +4,6 @@ import { type MapViewport, MapCamera, TILE_SIZE } from "./camera.ts";
 
 export const MAP_BACKGROUND = [7, 17, 13] as const;
 const MAX_CACHED_TILES = 64;
-export const TILE_LOADING_BASE = MAP_BACKGROUND;
 export const TILE_LOADING_HIGHLIGHT = [26, 73, 53] as const;
 export const SHIMMER_PERIOD = 24;
 
@@ -60,9 +59,9 @@ function fillBackground(pixels: Uint8ClampedArray): void {
 }
 
 function fillLoadingPixel(pixels: Uint8ClampedArray, offset: number): void {
-  pixels[offset] = TILE_LOADING_BASE[0];
-  pixels[offset + 1] = TILE_LOADING_BASE[1];
-  pixels[offset + 2] = TILE_LOADING_BASE[2];
+  pixels[offset] = MAP_BACKGROUND[0];
+  pixels[offset + 1] = MAP_BACKGROUND[1];
+  pixels[offset + 2] = MAP_BACKGROUND[2];
   pixels[offset + 3] = 255;
 }
 

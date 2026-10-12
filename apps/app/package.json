@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\"",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "catalog:",
+    "@osmix/app-components": "workspace:*",
+    "@osmix/app-core": "workspace:*",
+    "@osmix/ui": "workspace:*",
+    "comlink": "catalog:",
+    "jotai": "catalog:",
+    "jotai-family": "catalog:",
+    "lucide-react": "catalog:",
+    "maplibre-gl": "catalog:",
+    "osmix": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-map-gl": "catalog:",
+    "wouter": "catalog:"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/geojson": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxc-transform-react": "^0.151.0",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "^5.0.1"
+  }
+}

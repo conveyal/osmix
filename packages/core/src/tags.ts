@@ -360,13 +360,17 @@ export class Tags {
   }
 
   /**
-   * Get the approximate memory requirements for a given number of tags in bytes.
+   * Get the approximate memory requirements for a tag index in bytes.
+   *
+   * @param tagCount - Total key/value pairs. Each costs 12 bytes: key, value and the
+   * reverse key → entity index. The small per-key index arrays are not counted.
    */
-  static getBytesRequired(entityCount: number, taggedEntityCount = entityCount) {
+  static getBytesRequired(entityCount: number, taggedEntityCount = entityCount, tagCount = 0) {
     return (
       Math.ceil(entityCount / TAG_BITS_PER_WORD) * Uint32Array.BYTES_PER_ELEMENT +
       (Math.ceil(entityCount / TAG_RANK_BLOCK_SIZE) + 1) * Uint32Array.BYTES_PER_ELEMENT +
-      (taggedEntityCount + 1) * Uint32Array.BYTES_PER_ELEMENT
+      (taggedEntityCount + 1) * Uint32Array.BYTES_PER_ELEMENT +
+      tagCount * 3 * Uint32Array.BYTES_PER_ELEMENT // tagKeys + tagVals + keyEntities
     );
   }
 

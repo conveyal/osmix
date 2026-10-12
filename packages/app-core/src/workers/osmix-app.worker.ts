@@ -25,7 +25,14 @@ import {
 } from "osmix";
 import { OsmixWorker } from "osmix";
 
-import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../constants.ts";
+import {
+  DB_NAME,
+  DB_VERSION,
+  MERGE_DECISIONS_STORE,
+  OSM_STORE,
+  STORAGE_CHANNEL,
+} from "../constants.ts";
+import type { SavedMergeDecisions } from "../lib/merge-decisions.ts";
 import { hashStreamIncrementally } from "./incremental-hash.ts";
 import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "./storage-schema.ts";
 
@@ -54,6 +61,10 @@ export interface PbfUrlLoadResult {
 }
 
 export interface OsmixDB extends DBSchema {
+  [MERGE_DECISIONS_STORE]: {
+    key: string;
+    value: SavedMergeDecisions;
+  };
   [OSM_STORE]: {
     key: string;
     value: StoredOsm;
@@ -156,13 +167,18 @@ export class OsmixAppWorker extends OsmixWorker {
     this.hashControllers.get(taskId)?.abort();
   }
 
-  /** Fetch, hash, and parse a PBF in one streaming pass inside this worker. */
+  /**
+   * Fetch, hash, and parse a PBF in one streaming pass inside this worker. The dataset is
+   * registered as `<idPrefix><fileHash>`.
+   */
   async fromPbfUrl({
     url,
     options = {},
+    idPrefix = "",
   }: {
     url: string;
     options?: Partial<OsmFromPbfOptions>;
+    idPrefix?: string;
   }): Promise<PbfUrlLoadResult> {
     const response = await fetch(url);
     if (!response.ok) {
@@ -189,10 +205,11 @@ export class OsmixAppWorker extends OsmixWorker {
       const fileHash = hasher.digest("hex");
       const provisional = this.get(provisionalId);
       const loadDecision = this.getLoadDecision(provisionalId);
-      const osm = new Osm({ ...provisional.transferables(), id: fileHash });
+      const osmId = `${idPrefix}${fileHash}`;
+      const osm = new Osm({ ...provisional.transferables(), id: osmId });
       this.delete(provisionalId);
-      this.set(fileHash, osm);
-      this.setLoadDecision(fileHash, loadDecision);
+      this.set(osmId, osm);
+      this.setLoadDecision(osmId, loadDecision);
       const existing = await this.findByHash(fileHash);
       return {
         info: osm.info(),
@@ -336,9 +353,33 @@ export class OsmixAppWorker extends OsmixWorker {
   async deleteStoredOsm(id: string): Promise<void> {
     const db = await this.getDB();
     await db.delete(OSM_STORE, id);
+    // Saved review decisions go with either of their datasets.
+    for (const saved of await db.getAll(MERGE_DECISIONS_STORE)) {
+      if (saved.baseFileHash === id || saved.patchFileHash === id) {
+        await db.delete(MERGE_DECISIONS_STORE, saved.key);
+      }
+    }
     this.delete(id);
     this.broadcastChannel.postMessage({ type: "delete", id });
     this.notifyStorageChange();
+  }
+
+  /** The decisions saved for an input pair, if any. */
+  async getSavedMergeDecisions(key: string): Promise<SavedMergeDecisions | null> {
+    const db = await this.getDB();
+    return (await db.get(MERGE_DECISIONS_STORE, key)) ?? null;
+  }
+
+  /** Save a review's decisions for its input pair, replacing earlier ones. */
+  async saveMergeDecisions(saved: SavedMergeDecisions): Promise<void> {
+    const db = await this.getDB();
+    await db.put(MERGE_DECISIONS_STORE, saved);
+  }
+
+  /** Forget the decisions saved for an input pair. */
+  async deleteSavedMergeDecisions(key: string): Promise<void> {
+    const db = await this.getDB();
+    await db.delete(MERGE_DECISIONS_STORE, key);
   }
 
   /**
