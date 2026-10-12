@@ -63,7 +63,7 @@ void test("discovery ignores empty directories but fails malformed manifests", a
   const root = await mkdtemp(join(tmpdir(), "osmix-manifest-"));
   try {
     await mkdir(join(root, "packages", "valid"), { recursive: true });
-    await mkdir(join(root, "apps", "extract"), { recursive: true });
+    await mkdir(join(root, "apps", "empty"), { recursive: true });
     await mkdir(join(root, "apps", "malformed"), { recursive: true });
     await writeFile(
       join(root, "packages", "valid", "package.json"),

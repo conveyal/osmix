@@ -40,7 +40,7 @@ assert(typeof createRemote === "function", "createRemote import failed")
 const workerRuntime = getWorkerRuntime()
 const capabilities = getOsmixCapabilities()
 assert(
-  workerRuntime === "node" || workerRuntime === "bun" || workerRuntime === "deno",
+  workerRuntime === "node" || workerRuntime === "bun",
   "unexpected worker runtime: " + workerRuntime,
 )
 assert(capabilities.workerRuntime === workerRuntime, "capability runtime mismatch")
@@ -171,11 +171,11 @@ class RuntimeSmokeWorker extends OsmixWorker {
 await exposeOsmixWorker(new RuntimeSmokeWorker())
 `;
 
-type Runtime = "bun" | "deno" | "node";
+type Runtime = "bun" | "node";
 
 function getRuntime(): Runtime {
   const runtime = process.argv.slice(2).find((argument) => argument !== "--") ?? "node";
-  if (runtime === "bun" || runtime === "deno" || runtime === "node") return runtime;
+  if (runtime === "bun" || runtime === "node") return runtime;
   throw Error(`Unsupported smoke runtime: ${runtime}`);
 }
 
@@ -393,13 +393,8 @@ async function main(): Promise<void> {
     });
 
     console.log(`Running ${runtime} import and data smoke test...`);
-    if (runtime === "deno") {
-      run("deno", ["run", "--allow-env", "--allow-read", "./index.mjs"], consumerDir);
-    } else {
-      const executable =
-        runtime === "node" ? (process.env["OSMIX_NODE_BINARY"] ?? runtime) : runtime;
-      run(executable, ["./index.mjs"], consumerDir);
-    }
+    const executable = runtime === "node" ? (process.env["OSMIX_NODE_BINARY"] ?? runtime) : runtime;
+    run(executable, ["./index.mjs"], consumerDir);
     console.log(`${runtime}/npm smoke test passed`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });

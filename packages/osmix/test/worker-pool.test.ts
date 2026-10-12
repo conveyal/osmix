@@ -118,7 +118,7 @@ describe("OsmixWorkerPool", () => {
     },
   );
 
-  it.each(["web", "bun", "deno"] as const)(
+  it.each(["web", "bun"] as const)(
     "uses the Web Worker transport for the %s runtime",
     async (runtime) => {
       vi.stubGlobal("Worker", FakeWebWorker);

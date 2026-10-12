@@ -11,8 +11,8 @@ pnpm add @osmix/shortbread
 ## Usage
 
 ```typescript
-import { fromPbf } from "osmix";
 import { ShortbreadVtEncoder } from "@osmix/shortbread";
+import { fromPbf } from "osmix";
 
 // Load OSM data
 const osm = await fromPbf(pbfStream);

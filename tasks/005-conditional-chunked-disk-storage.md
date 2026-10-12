@@ -181,7 +181,7 @@ Add streaming methods if measurements show that whole-chunk reads are still too 
 Recommended layering:
 
 - schema/manifest/codec logic in a new package only if multiple apps/runtimes will use it;
-- OPFS implementation and browser permission/UI in `apps/merge` initially;
+- OPFS implementation in `packages/app-core` and browser permission/UI in `apps/app` initially;
 - in-memory fake implementation in tests;
 - optional Node filesystem adapter later, behind the same interface, if it provides meaningful parity.
 
@@ -743,10 +743,10 @@ The exact locations depend on the Phase 0 scope, but likely areas include:
 - Task 004 read contracts in `packages/core/src/contracts.ts`;
 - `packages/load` streaming entity/PBF adapters;
 - `packages/osmix` async reader and worker orchestration APIs;
-- `apps/merge/src/workers/osm.worker.ts` or a dedicated storage worker;
-- `apps/merge/src/lib/merge-remote.ts`;
-- `apps/merge/src/lib/storage-utils.ts`;
-- `apps/merge/src/settings.ts` and storage schema/catalog modules;
+- `packages/app-core/src/workers/osmix-app.worker.ts` or a dedicated storage worker;
+- `packages/app-core/src/remote.ts`;
+- `packages/app-core/src/lib/storage-utils.ts`;
+- `apps/app/src/settings.ts` and `packages/app-core/src/workers/storage-schema.ts`;
 - stored dataset list, File info, Activity, failure diagnostics, and capability gates;
 - browser-only integration/e2e tests;
 - storage format documentation and manual acceptance checklist.

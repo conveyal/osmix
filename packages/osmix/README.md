@@ -160,7 +160,6 @@ console.log(remote.mode, remote.workerCount); // "single-worker", 1
 | Browser, [cross-origin isolated][coi]        | `multi-worker`  | One worker per core; datasets shared via `SharedArrayBuffer`      |
 | Browser, not isolated (no COOP/COEP headers) | `single-worker` | One worker; data is transferred/copied instead of shared          |
 | Bun                                          | Web Workers     | Runs off-thread; shared buffers enable multi-worker datasets      |
-| Deno                                         | Web Workers     | Runs off-thread; local worker entries require read permission     |
 | Node 24+                                     | worker threads  | Runs off-thread; shared buffers enable multi-worker datasets      |
 | No worker implementation                     | throws          | Pass `inProcess: true` or use the main-thread API                 |
 | `createRemote({ inProcess: true })`          | `in-process`    | Same API on the calling thread; long operations block that thread |
@@ -231,6 +230,7 @@ This Vite-specific import is schematic because the `?worker&url` module is creat
 
 ```ts schematic
 import { createRemote } from "osmix";
+
 import workerUrl from "./osm.worker.ts?worker&url";
 
 const remote = await createRemote({
@@ -260,6 +260,7 @@ The matching Vite client wiring is also schematic:
 
 ```ts schematic
 import { createRemote } from "osmix";
+
 import type { MyWorker } from "./my.worker.ts";
 import workerUrl from "./my.worker.ts?worker&url";
 
@@ -301,6 +302,7 @@ Applications with custom worker protocols can use the supported
 
 ```ts schematic
 import { createOsmixWorkerPool } from "osmix/worker-pool";
+
 import type { MyWorker } from "./my.worker.ts";
 
 const pool = await createOsmixWorkerPool<MyWorker>({
@@ -429,12 +431,12 @@ spec-compliant without staging everything in memory.
 
 ### Workers (OsmixRemote)
 
-- `createRemote(options?)` - Create a browser, Bun, Deno, or Node worker pool manager.
+- `createRemote(options?)` - Create a browser, Bun, or Node worker pool manager.
   - `options.workerCount` - Number of workers (default: all cores when SABs are shareable, else 1).
   - `options.workerUrl` - Custom worker entry (see [Workers](#workers)).
   - `options.inProcess` - Explicitly run on the calling thread (blocking; useful in tests).
   - `options.restoreTimeoutMs` - Bound replacement-worker rehydration time.
-  - `options.workerRuntime` - Override automatic `"web" | "bun" | "deno" | "node"` selection.
+  - `options.workerRuntime` - Override automatic `"web" | "bun" | "node"` selection.
 - `getOsmixCapabilities()` - Inspect runtime support (workers, SAB sharing, max workers, recommended mode).
 - `canShareArrayBuffers()` - Whether `SharedArrayBuffer`s can be posted between threads.
 - `remote.mode` - Selected mode: `"multi-worker" | "single-worker" | "in-process"`.

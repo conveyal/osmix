@@ -86,7 +86,7 @@ export interface OsmixWorkerConnection<T extends object> {
   terminate(): Promise<void>;
 }
 
-/** Options for creating one browser, Bun, Deno, Node, or in-process worker connection. */
+/** Options for creating one browser, Bun, Node, or in-process worker connection. */
 export interface CreateOsmixWorkerConnectionOptions<T extends object> {
   workerUrl?: URL;
   runtime?: WorkerRuntime | "auto";
@@ -245,7 +245,7 @@ async function createNodeConnection<T extends object>(
   };
 }
 
-/** Create a Comlink worker connection in browsers, Bun, Deno, Node, or in-process. */
+/** Create a Comlink worker connection in browsers, Bun, Node, or in-process. */
 export async function createOsmixWorkerConnection<T extends object = OsmixWorker>({
   workerUrl = defaultOsmixWorkerUrl(),
   runtime = "auto",
@@ -253,7 +253,7 @@ export async function createOsmixWorkerConnection<T extends object = OsmixWorker
 }: CreateOsmixWorkerConnectionOptions<T> = {}): Promise<OsmixWorkerConnection<T>> {
   if (inProcessWorker) return createInProcessConnection(inProcessWorker);
   const selected = runtime === "auto" ? getWorkerRuntime() : runtime;
-  if (selected === "web" || selected === "bun" || selected === "deno") {
+  if (selected === "web" || selected === "bun") {
     return createWebConnection<T>(workerUrl, selected);
   }
   if (selected === "node") return createNodeConnection<T>(workerUrl);
@@ -262,7 +262,7 @@ export async function createOsmixWorkerConnection<T extends object = OsmixWorker
   );
 }
 
-/** Expose an Osmix worker through a browser/Bun/Deno global or Node parent-port endpoint. */
+/** Expose an Osmix worker through a browser/Bun global or Node parent-port endpoint. */
 export async function exposeOsmixWorker<T extends object>(worker: T): Promise<void> {
   const runtime = getWorkerRuntime();
   if (runtime === "node") {

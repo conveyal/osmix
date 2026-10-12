@@ -21,6 +21,8 @@ Files saved to browser storage open on every page. **Open in** sends a loaded da
 - Opt in to reviewed, one-meter proximity matching for importing selected properties or attaching compatible imported networks without rewriting base geometry.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
 
+Vector and merge-plan tile protocols reject cancelled requests with the abort reason. Completed requests return tile buffers.
+
 ## Prerequisites
 
 - Node.js 20+ and pnpm
