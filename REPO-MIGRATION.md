@@ -27,7 +27,7 @@ Target repos (org `osmix-dev`):
 - `duckdb-comparison` — from `apps/bench`, private
 - `tiles` — `apps/shortbread` (shortbread-server) + `apps/vt-server`, private
 - `cli` — `packages/cli`, publishes `@osmix/cli` + Bun executables
-- `apps` — merge/inspect/extract + ui/app-core/app-components, private, Vercel deploys
+- `apps` — apps/app (Merge, Inspect, and Extract pages) + ui/app-core/app-components, private, Vercel deploys
 
 ## Phase 0 — Prepare the core repo
 
@@ -58,8 +58,8 @@ Target repos (org `osmix-dev`):
 
 **apps**
 
-- Move `apps/app` (and the redirect-only `apps/merge`, `apps/inspect`, `apps/extract`) + `packages/{ui,app-core,app-components}` with `packages/ui/DESIGN.md`, `apps/app/DESIGN.md`, Playwright e2e, portless setup, `vercel.json`s.
-- Re-point the app's Vercel project (and the three redirect projects, while they exist) to the new repo (root directories unchanged relative to repo root).
+- Move `apps/app` + `packages/{ui,app-core,app-components}` with `packages/ui/DESIGN.md`, `apps/app/DESIGN.md`, Playwright e2e, portless setup, `vercel.json`s.
+- Re-point the app's Vercel project to the new repo (root directories unchanged relative to repo root).
 - Split AGENTS.md: UI/app sections move to the apps repo; `docs/merge-process.md` stays in core (it governs `@osmix/change`), apps repo links to it.
 - Core cleanup: remove Tailwind/React/Playwright/`oxlint-tailwindcss` and UI catalog entries not used by www.
 
