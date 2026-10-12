@@ -1,5 +1,5 @@
 /**
- * Planner memory and time per phase, for one base and patch PBF (Task T34, tasks/004).
+ * Planner memory and time per phase, for one base and patch PBF (Task T34, docs/tasks/004).
  *
  *   pnpm --filter @osmix/bench run plan-memory -- <base.pbf> <patch.pbf> [--apply] [--replan]
  *     [--no-matching] [--digest] [--automation=<level>] [--fresh]
