@@ -1,5 +1,14 @@
 # @osmix/gtfs
 
+## 0.0.13
+
+### Patch Changes
+
+- Updated dependencies:
+  - @osmix/core@0.3.1
+  - @osmix/raster@0.1.1
+  - @osmix/types@0.3.0
+
 ## 0.0.12
 
 ### Patch Changes

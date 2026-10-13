@@ -1,5 +1,15 @@
 # @osmix/pbf
 
+## 0.1.0
+
+### Minor Changes
+
+- `@osmix/pbf` has no runtime dependencies: its protobuf reader and writer are now a typed port of `pbf` 5.1.2's `PbfReader` and `PbfWriter`, exported from the new `@osmix/pbf/protobuf` entry. They write the same bytes as `pbf`. `@osmix/vt` encodes vector tiles with it instead of depending on `pbf`, which drops `pbf`, `resolve-protobuf-schema` and `protocol-buffers-schema` from installs.
+
+### Patch Changes
+
+- `PbfWriter.writePackedVarint` throws for values that do not fit in a varint (`Infinity`, 2^64 and up), as `writeVarint` does. Before, `Infinity` looped forever and 2^64 and up wrote past the bytes the writer had reserved.
+
 ## 0.0.10
 
 ### Patch Changes

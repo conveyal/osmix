@@ -1,5 +1,27 @@
 # osmix
 
+## 0.4.1
+
+### Patch Changes
+
+- Add `isDeepEqual` to `@osmix/types/utils`: deep equality for primitives, arrays and plain objects, which throws a `TypeError` for other objects such as typed arrays and maps. Entity equality, merge plans and the worker's changeset filters use it instead of `dequal`, which is no longer a dependency of `@osmix/types`, `@osmix/change` or `osmix`.
+
+- Updated dependencies:
+  - @osmix/change@0.2.1
+  - @osmix/core@0.3.1
+  - @osmix/geo@0.2.0
+  - @osmix/geojson@0.0.18
+  - @osmix/geoparquet@0.1.12
+  - @osmix/gtfs@0.0.13
+  - @osmix/json@0.0.18
+  - @osmix/load@0.1.1
+  - @osmix/pbf@0.1.0
+  - @osmix/raster@0.1.1
+  - @osmix/router@0.1.1
+  - @osmix/shapefile@0.0.14
+  - @osmix/types@0.3.0
+  - @osmix/vt@0.1.1
+
 ## 0.4.0
 
 ### Minor Changes

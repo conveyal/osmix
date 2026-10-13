@@ -1,5 +1,14 @@
 # @osmix/cli
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @osmix/geo@0.2.0
+  - @osmix/shortbread@0.1.1
+  - osmix@0.4.1
+
 ## 0.0.2
 
 ### Patch Changes

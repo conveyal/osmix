@@ -1,5 +1,15 @@
 # @osmix/raster
 
+## 0.1.1
+
+### Patch Changes
+
+- Polygon winding now comes from the new `@osmix/geo/rewind` module (`rewindRing`, `rewindGeometry`, `rewindFeature`) instead of `@placemarkio/geojson-rewind`. That package lists `@changesets/cli` as a runtime dependency, so installing `@osmix/geojson`, `@osmix/geoparquet`, `@osmix/raster`, `@osmix/shapefile` or `osmix` no longer installs about 155 unneeded packages.
+
+- Updated dependencies:
+  - @osmix/geo@0.2.0
+  - @osmix/types@0.3.0
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @osmix/test-utils
 
+## 0.1.1
+
+### Patch Changes
+
+- Publish `main` and `types` pointing at the built entry module instead of a missing `./dist/index.js`.
+
 ## 0.1.0
 
 ### Minor Changes

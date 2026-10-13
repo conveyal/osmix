@@ -1,5 +1,15 @@
 # @osmix/core
 
+## 0.3.1
+
+### Patch Changes
+
+- Way and relation `neighbors` queries use a typed port of `geoflatbush`'s `around` search instead of depending on `geoflatbush`. Results are unchanged.
+
+- Updated dependencies:
+  - @osmix/geo@0.2.0
+  - @osmix/types@0.3.0
+
 ## 0.3.0
 
 ### Minor Changes
