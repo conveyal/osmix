@@ -23,11 +23,11 @@
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "flatbush": "^4.6.2",
-    "geoflatbush": "^2.2.1"
+    "flatbush": "^4.6.2"
   },
   "devDependencies": {
     "@osmix/pbf": "workspace:*",
+    "geoflatbush": "^2.2.1",
     "typescript": "catalog:"
   },
   "engines": {

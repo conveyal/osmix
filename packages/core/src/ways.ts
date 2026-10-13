@@ -2,9 +2,9 @@ import type { OsmPbfWay } from "@osmix/pbf";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
 import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "@osmix/types";
 import Flatbush from "flatbush";
-import { around as geoAround } from "geoflatbush";
 
 import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
+import { flatbushAround } from "./flatbush-around.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
 import { MAX_UINT32_OFFSET, MAX_WAY_REFS, assertCapacity } from "./limits.ts";
 import type { Nodes } from "./nodes.ts";
@@ -389,8 +389,7 @@ export class Ways extends Entities<OsmWay> {
    */
   neighbors(lon: number, lat: number, maxResults?: number, maxDistanceKm?: number): number[] {
     if (this.size === 0) return [];
-    // Use geoflatbush for proper geographic distance calculations
-    return geoAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm, (index) => {
+    return flatbushAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm, (index) => {
       const offset = index * 4;
       return isValidSpatialBbox(
         this.bbox.at(offset),

@@ -715,13 +715,13 @@ importers:
       flatbush:
         specifier: ^4.6.2
         version: 4.6.2
-      geoflatbush:
-        specifier: ^2.2.1
-        version: 2.2.1
     devDependencies:
       '@osmix/pbf':
         specifier: workspace:*
         version: link:../pbf
+      geoflatbush:
+        specifier: ^2.2.1
+        version: 2.2.1
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
