@@ -18,11 +18,11 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@mapbox/tilebelt": "^2.0.3",
     "@osmix/types": "workspace:*",
     "lineclip": "^2.0.0"
   },
   "devDependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
     "@osmix/shared": "workspace:*",
     "@types/geojson": "catalog:",
     "typescript": "catalog:"

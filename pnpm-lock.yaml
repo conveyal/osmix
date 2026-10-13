@@ -728,9 +728,6 @@ importers:
 
   packages/geo:
     dependencies:
-      '@mapbox/tilebelt':
-        specifier: ^2.0.3
-        version: 2.0.3
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
@@ -738,6 +735,9 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0
     devDependencies:
+      '@mapbox/tilebelt':
+        specifier: ^2.0.3
+        version: 2.0.3
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared

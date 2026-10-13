@@ -8,12 +8,23 @@
  * @module
  */
 
-import { pointToTileFraction } from "@mapbox/tilebelt";
 import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "@osmix/types";
 
 const RADIANS_TO_DEGREES = 180 / Math.PI;
+const DEGREES_TO_RADIANS = Math.PI / 180;
 
-export { pointToTileFraction };
+/**
+ * Get the fractional Web Mercator tile position of a point at a zoom level.
+ * Wraps x into `[0, 2^z)`. Matches `pointToTileFraction` from `@mapbox/tilebelt` 2.0.3.
+ */
+export function pointToTileFraction(lon: number, lat: number, z: number): Tile {
+  const sin = Math.sin(lat * DEGREES_TO_RADIANS);
+  const z2 = 2 ** z;
+  let x = (z2 * (lon / 360 + 0.5)) % z2;
+  if (x < 0) x += z2;
+  const y = z2 * (0.5 - (0.25 * Math.log((1 + sin) / (1 - sin))) / Math.PI);
+  return [x, y, z];
+}
 
 function tile2lon(x: number, z: number): number {
   return (x / 2 ** z) * 360 - 180;
