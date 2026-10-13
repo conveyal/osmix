@@ -14,5 +14,5 @@
     }
   },
   "ignore": ["apps/www/shiki.bundle.ts"],
-  "ignoreBinaries": ["expect", "script"]
+  "ignoreBinaries": ["change", "expect", "script"]
 }

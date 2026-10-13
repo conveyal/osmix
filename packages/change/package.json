@@ -13,9 +13,21 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@osmix/core": "workspace:*",

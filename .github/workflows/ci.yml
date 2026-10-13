@@ -25,6 +25,9 @@ jobs:
       - name: Format, lint and type check
         run: pnpm exec oxfmt --check . && pnpm exec oxlint -f github
 
+      - name: Check change intents and versions
+        run: pnpm change check
+
       - name: Check unused files, exports and dependencies (knip)
         run: pnpm run knip
 
