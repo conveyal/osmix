@@ -9,6 +9,21 @@ autoInstallPeers: true
 enableGlobalVirtualStore: true
 minimumReleaseAge: 0
 
+# Release management: `pnpm change`, `pnpm version -r`, `pnpm publish -r`. See "Releasing" in README.md.
+versioning:
+  changelog:
+    storage: repository
+  # Every private workspace; `scripts/release-config.test.ts` checks this list.
+  ignore:
+    - "@osmix/app"
+    - "@osmix/app-components"
+    - "@osmix/app-core"
+    - "@osmix/bench"
+    - "@osmix/shortbread-server"
+    - "@osmix/ui"
+    - "@osmix/vt-server"
+    - "@osmix/www"
+
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true

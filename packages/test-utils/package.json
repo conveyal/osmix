@@ -14,8 +14,24 @@
     ".": "./src/fixtures.ts",
     "./*": "./src/*.ts"
   },
+  "publishConfig": {
+    "main": "./dist/fixtures.js",
+    "types": "./dist/fixtures.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/fixtures.d.ts",
+        "default": "./dist/fixtures.js"
+      },
+      "./*": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build"
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",

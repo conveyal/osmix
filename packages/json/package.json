@@ -10,9 +10,15 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@osmix/pbf": "workspace:*",

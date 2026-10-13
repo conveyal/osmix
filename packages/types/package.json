@@ -14,8 +14,24 @@
     ".": "./src/types.ts",
     "./*": "./src/*.ts"
   },
+  "publishConfig": {
+    "main": "./dist/types.js",
+    "types": "./dist/types.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/types.d.ts",
+        "default": "./dist/types.js"
+      },
+      "./*": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "dequal": "catalog:"

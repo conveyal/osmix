@@ -157,6 +157,20 @@ Complete TypeScript examples are marked `check-docs` and compiled by a test in `
 
 Routing regressions use checked-in Monaco and small generated fixtures. Reports distinguish declared route assertions from policy diagnostics and node-ID lookup from coordinate snapping. The [optional local R5 comparison](packages/osmix/test/r5/README.md) records its own endpoint-resolution and assertion evidence; R5 and large local datasets are not required by the normal test suite or CI.
 
+### Releasing
+
+Releases use pnpm's built-in versioning (`versioning` in `pnpm-workspace.yaml`). A pull request that changes a published package records a change intent in `.changeset/`; its summary becomes the package's `CHANGELOG.md` entry. Packages that depend on a bumped package with `workspace:*` get a patch bump automatically.
+
+```bash
+# Record a change intent (use --bump none when the change needs no release)
+pnpm change @osmix/core osmix --bump minor --summary "Add Osm.renumberNegativeIds"
+
+# Show pending intents and the release plan they produce
+pnpm change status
+```
+
+To release, run `pnpm version -r` on a branch from an up-to-date `main`. It applies the pending intents to versions and changelogs. Commit the result as "Version packages", open a pull request, and merge it. When CI passes on `main`, the release workflow runs `pnpm publish -r`, which publishes every version that is not yet on npm, then creates a `<name>@<version>` tag and GitHub release for each. Each package's `prepack` script builds it, and its `publishConfig` points the published entry points at `dist/`.
+
 ## Apps
 
 - **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
