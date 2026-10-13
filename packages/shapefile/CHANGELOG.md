@@ -1,5 +1,18 @@
 # @osmix/shapefile
 
+## 0.0.14
+
+### Patch Changes
+
+- Polygon winding now comes from the new `@osmix/geo/rewind` module (`rewindRing`, `rewindGeometry`, `rewindFeature`) instead of `@placemarkio/geojson-rewind`. That package lists `@changesets/cli` as a runtime dependency, so installing `@osmix/geojson`, `@osmix/geoparquet`, `@osmix/raster`, `@osmix/shapefile` or `osmix` no longer installs about 155 unneeded packages.
+
+- `@types/geojson` is now a dependency instead of a devDependency of the packages whose published type declarations import `geojson`, so TypeScript consumers no longer have to install it themselves.
+
+- Updated dependencies:
+  - @osmix/core@0.3.1
+  - @osmix/geo@0.2.0
+  - @osmix/types@0.3.0
+
 ## 0.0.13
 
 ### Patch Changes

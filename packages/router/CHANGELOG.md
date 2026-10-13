@@ -1,5 +1,14 @@
 # @osmix/router
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies:
+  - @osmix/core@0.3.1
+  - @osmix/geo@0.2.0
+  - @osmix/types@0.3.0
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,17 @@
 # @osmix/vt
 
+## 0.1.1
+
+### Patch Changes
+
+- `@osmix/pbf` has no runtime dependencies: its protobuf reader and writer are now a typed port of `pbf` 5.1.2's `PbfReader` and `PbfWriter`, exported from the new `@osmix/pbf/protobuf` entry. They write the same bytes as `pbf`. `@osmix/vt` encodes vector tiles with it instead of depending on `pbf`, which drops `pbf`, `resolve-protobuf-schema` and `protocol-buffers-schema` from installs.
+
+- Updated dependencies:
+  - @osmix/core@0.3.1
+  - @osmix/geo@0.2.0
+  - @osmix/pbf@0.1.0
+  - @osmix/types@0.3.0
+
 ## 0.1.0
 
 ### Minor Changes

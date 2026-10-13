@@ -1,5 +1,15 @@
 # @osmix/types
 
+## 0.3.0
+
+### Minor Changes
+
+- Add `isDeepEqual` to `@osmix/types/utils`: deep equality for primitives, arrays and plain objects, which throws a `TypeError` for other objects such as typed arrays and maps. Entity equality, merge plans and the worker's changeset filters use it instead of `dequal`, which is no longer a dependency of `@osmix/types`, `@osmix/change` or `osmix`.
+
+### Patch Changes
+
+- Publish `main` and `types` pointing at the built entry module instead of a missing `./dist/index.js`.
+
 ## 0.2.0
 
 ### Minor Changes

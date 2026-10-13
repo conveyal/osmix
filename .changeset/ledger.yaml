@@ -1,0 +1,58 @@
+"@osmix/change@0.2.1":
+  dir: packages/change
+  intents:
+    - replace-dequal
+    - ship-geojson-types
+"@osmix/core@0.3.1":
+  dir: packages/core
+  intents:
+    - inline-geoflatbush
+"@osmix/geo@0.2.0":
+  dir: packages/geo
+  intents:
+    - inline-geojson-rewind
+    - inline-lineclip
+    - inline-tilebelt
+    - ship-geojson-types
+    - thick-flowers-give
+"@osmix/geojson@0.0.18":
+  dir: packages/geojson
+  intents:
+    - inline-geojson-rewind
+    - ship-geojson-types
+"@osmix/geoparquet@0.1.12":
+  dir: packages/geoparquet
+  intents:
+    - inline-geojson-rewind
+    - ship-geojson-types
+"@osmix/pbf@0.1.0":
+  dir: packages/pbf
+  intents:
+    - inline-pbf-protobuf
+    - packed-varint-range
+"@osmix/raster@0.1.1":
+  dir: packages/raster
+  intents:
+    - inline-geojson-rewind
+"@osmix/shapefile@0.0.14":
+  dir: packages/shapefile
+  intents:
+    - inline-geojson-rewind
+    - ship-geojson-types
+"@osmix/test-utils@0.1.1":
+  dir: packages/test-utils
+  intents:
+    - thick-flowers-give
+"@osmix/types@0.3.0":
+  dir: packages/types
+  intents:
+    - replace-dequal
+    - thick-flowers-give
+"@osmix/vt@0.1.1":
+  dir: packages/vt
+  intents:
+    - inline-pbf-protobuf
+osmix@0.4.1:
+  dir: packages/osmix
+  intents:
+    - replace-dequal

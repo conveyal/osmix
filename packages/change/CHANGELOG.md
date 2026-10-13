@@ -1,5 +1,19 @@
 # @osmix/change
 
+## 0.2.1
+
+### Patch Changes
+
+- Add `isDeepEqual` to `@osmix/types/utils`: deep equality for primitives, arrays and plain objects, which throws a `TypeError` for other objects such as typed arrays and maps. Entity equality, merge plans and the worker's changeset filters use it instead of `dequal`, which is no longer a dependency of `@osmix/types`, `@osmix/change` or `osmix`.
+
+- `@types/geojson` is now a dependency instead of a devDependency of the packages whose published type declarations import `geojson`, so TypeScript consumers no longer have to install it themselves.
+
+- Updated dependencies:
+  - @osmix/core@0.3.1
+  - @osmix/geo@0.2.0
+  - @osmix/router@0.1.1
+  - @osmix/types@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
