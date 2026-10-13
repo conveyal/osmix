@@ -1,7 +1,6 @@
-import { PbfReader } from "pbf";
-
 import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks.ts";
 import { type OsmPbfBlobHeader, readBlob, readBlobHeader } from "./proto/fileformat.ts";
+import { PbfReader } from "./protobuf.ts";
 import { MAX_BLOB_SIZE_BYTES, MAX_HEADER_SIZE_BYTES } from "./spec.ts";
 
 export type OsmPbfBlobFrame = {

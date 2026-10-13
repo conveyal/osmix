@@ -1,10 +1,10 @@
-import { PbfWriter } from "pbf";
 import { describe, expect, it } from "vitest";
 
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks";
 import { createOsmPbfBlobFrameGenerator, createOsmPbfBlobGenerator } from "../src/pbf-to-blobs";
 import { writeBlob, writeBlobHeader } from "../src/proto/fileformat";
 import { writeHeaderBlock } from "../src/proto/osmformat";
+import { PbfWriter } from "../src/protobuf";
 import { MAX_BLOB_SIZE_BYTES, MAX_HEADER_SIZE_BYTES } from "../src/spec";
 import { concatUint8, uint32BE } from "../src/utils";
 import {

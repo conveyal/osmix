@@ -9,6 +9,7 @@ Low-level TypeScript library for reading and writing OpenStreetMap PBF data. Sta
 - **Serialize** header and primitive blocks back to spec-compliant blobs with size guardrails.
 - **Types** generated from protobuf schemas for type-safe access to OSM data structures.
 - **Utilities** for compression, concatenation, and big-endian encoding tuned for the PBF format.
+- **No runtime dependencies**: the protobuf reader and writer are built in.
 
 ## Installation
 
@@ -84,6 +85,10 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 | ------------------------------------ | ---------------------------------------------------- |
 | `osmBlockToPbfBlobBytes(block)`      | Serialize a block to spec-compliant PBF bytes        |
 | `OsmBlocksToPbfBytesTransformStream` | TransformStream: header/primitive blocks → PBF bytes |
+
+### Protobuf
+
+`@osmix/pbf/protobuf` exports `PbfReader` and `PbfWriter`, the low-level protocol buffer reader and writer used by the generated PBF code and by `@osmix/vt`. They are a typed port of the parts of [`pbf`](https://github.com/mapbox/pbf) that Osmix uses, with the same method names and output.
 
 ### Types
 

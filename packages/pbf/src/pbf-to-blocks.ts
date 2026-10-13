@@ -1,5 +1,3 @@
-import { PbfReader } from "pbf";
-
 import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts";
 import { createOsmPbfBlobFrameGenerator } from "./pbf-to-blobs.ts";
 import {
@@ -8,6 +6,7 @@ import {
   readHeaderBlock,
   readPrimitiveBlock,
 } from "./proto/osmformat.ts";
+import { PbfReader } from "./protobuf.ts";
 import { MAX_BLOB_SIZE_BYTES } from "./spec.ts";
 import { type AsyncGeneratorValue, toAsyncGenerator, webDecompress } from "./utils.ts";
 

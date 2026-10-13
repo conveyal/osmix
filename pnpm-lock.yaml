@@ -941,10 +941,6 @@ importers:
         version: 5.0.3(@types/node@26.6.5)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/pbf:
-    dependencies:
-      pbf:
-        specifier: 'catalog:'
-        version: 5.1.2
     devDependencies:
       '@osmix/shared':
         specifier: workspace:*
@@ -952,6 +948,9 @@ importers:
       '@osmix/test-utils':
         specifier: workspace:*
         version: link:../test-utils
+      pbf:
+        specifier: 'catalog:'
+        version: 5.1.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1156,12 +1155,12 @@ importers:
       '@osmix/geo':
         specifier: workspace:*
         version: link:../geo
+      '@osmix/pbf':
+        specifier: workspace:*
+        version: link:../pbf
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
-      pbf:
-        specifier: 'catalog:'
-        version: 5.1.2
     devDependencies:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
@@ -1172,6 +1171,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      pbf:
+        specifier: 'catalog:'
+        version: 5.1.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -7,11 +7,10 @@
  * @module
  */
 
-import { PbfWriter } from "pbf";
-
 import { writeBlob, writeBlobHeader } from "./proto/fileformat.ts";
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat.ts";
 import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat.ts";
+import { PbfWriter } from "./protobuf.ts";
 import {
   MAX_BLOB_SIZE_BYTES,
   MAX_HEADER_SIZE_BYTES,
