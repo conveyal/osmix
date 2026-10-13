@@ -66,6 +66,27 @@ describe("PbfWriter", () => {
   });
 });
 
+describe("PbfWriter.writePackedVarint", () => {
+  test("rejects values that do not fit in a varint instead of looping or overrunning", () => {
+    for (const value of [Infinity, 2 ** 64, 2 ** 70]) {
+      expect(() => new PbfWriter().writePackedVarint(1, [1, value])).toThrow(
+        "Given varint doesn't fit into 10 bytes",
+      );
+    }
+  });
+
+  test("writes large and non-integer values the same bytes as writeVarint", () => {
+    const values = [2 ** 53, 2 ** 60, 2 ** 63, Number.NaN, 300.5, 1.5];
+    const packed = new PbfWriter();
+    packed.writePackedVarint(1, values);
+    const scalar = new PbfWriter();
+    scalar.writeRawMessage(() => {
+      for (const v of values) scalar.writeVarint(v);
+    }, null);
+    expect(packed.finish().subarray(1)).toEqual(scalar.finish());
+  });
+});
+
 describe("PbfReader", () => {
   test("reads every field the writer wrote", () => {
     const writer = new PbfWriter();

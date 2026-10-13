@@ -409,8 +409,11 @@ function makeRoomForExtraLength(startPos: number, len: number, pbf: PbfWriter): 
 
 /**
  * Packed varints often dominate encode time, so write the bytes inline
- * through a local buffer pointer rather than calling writeVarint per element,
- * falling back to writeVarint only for negatives or near the buffer's end.
+ * through a local buffer pointer rather than calling writeVarint per element.
+ * Anything but a non-negative safe integer (negatives, NaN, Infinity, values
+ * of 2^53 and up) falls back to writeVarint, which handles or rejects it, as
+ * does any value near the buffer's end. Unlike pbf, which loops forever on
+ * Infinity and overruns its buffer at 2^64 and up.
  */
 function writePackedVarint(arr: number[], pbf: PbfWriter): void {
   const n = arr.length;
@@ -419,8 +422,8 @@ function writePackedVarint(arr: number[], pbf: PbfWriter): void {
   let limit = pbf.length;
   for (let i = 0; i < n; i++) {
     let val = arr[i]!;
-    if (val < 0 || pos + 10 > limit) {
-      // slow path: grows the buffer, handles 10-byte values
+    if (!(val >= 0 && val <= Number.MAX_SAFE_INTEGER) || pos + 10 > limit) {
+      // slow path: grows the buffer, handles 10-byte values and rejects ones that do not fit
       pbf.pos = pos;
       pbf.writeVarint(val);
       buf = pbf.buf;
