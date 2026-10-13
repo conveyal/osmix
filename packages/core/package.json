@@ -15,9 +15,29 @@
     "./contracts": "./src/contracts.ts",
     "./mocks": "./src/mocks.ts"
   },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./contracts": {
+        "types": "./dist/contracts.d.ts",
+        "default": "./dist/contracts.js"
+      },
+      "./mocks": {
+        "types": "./dist/mocks.d.ts",
+        "default": "./dist/mocks.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@osmix/geo": "workspace:*",

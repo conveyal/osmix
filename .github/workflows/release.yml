@@ -1,41 +1,57 @@
 name: Release
 
-permissions:
-  id-token: write # Required for OIDC
-  contents: write
-  pull-requests: write
-
+# Publishes after CI passes on a push to `main`. npm trusted publishing (OIDC) is configured
+# against this file name, so keep the release job here rather than in `ci.yml`.
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+permissions:
+  id-token: write # npm trusted publishing (OIDC) and provenance
+  contents: write # tags and GitHub releases
+
+concurrency: ${{ github.workflow }}
 
 jobs:
   release:
     name: Release
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    env:
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: pnpm/setup@v3
 
-      - name: Create Release Pull Request or Publish to npm
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          # After versioning, `pnpm install` must be run to update the package.json files.
-          version: pnpm run version
+      # Skips versions already on npm. `prepack` builds each package and `publishConfig`
+      # points its entries at `dist/`. The checkout is detached, so skip the branch check.
+      - name: Publish to npm
+        run: pnpm publish -r --no-git-checks
 
-          # `npm pack` is necessary to replace workspace deps.
-          # But we need `npm publish` to publish via OIDC.
-          publish: pnpm run release
+      # Derived from the package versions rather than this run's publish summary, so a rerun after
+      # a partial failure still releases versions that an earlier attempt published.
+      - name: Create tags and GitHub releases
+        run: |
+          pnpm ls -r --depth -1 --json |
+            jq -r '.[] | select(.private != true and .name != null)
+              | "\(.name)\t\(.version)\t\(.path)"' |
+            while IFS=$'\t' read -r name version dir; do
+              tag="$name@$version"
+              gh release view "$tag" > /dev/null 2>&1 < /dev/null && continue
+              [ -n "$(pnpm view "$tag" version < /dev/null 2> /dev/null)" ] || continue
+              awk -v v="$version" '$0 == "## " v {f=1; next} f && /^## / {exit} f' \
+                "$dir/CHANGELOG.md" > release-notes.md
+              gh release create "$tag" --target "$HEAD_SHA" \
+                --title "$tag" --notes-file release-notes.md < /dev/null
+            done
         env:
-          GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-          NPM_TOKEN: "" # Workaround to support trusted publishing
+          GH_TOKEN: ${{ github.token }}
 
       - name: Setup Bun for standalone executables
         uses: oven-sh/setup-bun@v2

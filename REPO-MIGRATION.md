@@ -31,9 +31,9 @@ Target repos (org `osmix-dev`):
 
 ## Phase 0 — Prepare the core repo
 
-1. **Release pending changesets** (24) via the existing `release.yml` flow to set a version baseline.
-2. **Transfer** `conveyal/osmix` → `osmix-dev/osmix`: update every `repository.url` in `packages/*/package.json`, reconfigure npm trusted publishing (OIDC) per `@osmix/*` package, reconnect Vercel Git integration for `apps/www` (and the three apps until they move). Changeset + release so npm metadata points at the new home.
-3. **`@osmix/config`** (new `packages/config`): move tsconfig presets out of `@osmix/shared`; add oxlint + oxfmt presets from the root configs; root and all workspaces consume it. Changeset (`@osmix/shared` minor for removed presets).
+1. **Release pending change intents** via the existing `release.yml` flow to set a version baseline.
+2. **Transfer** `conveyal/osmix` → `osmix-dev/osmix`: update every `repository.url` in `packages/*/package.json`, reconfigure npm trusted publishing (OIDC) per `@osmix/*` package, reconnect Vercel Git integration for `apps/www` (and the three apps until they move). Change intent + release so npm metadata points at the new home.
+3. **`@osmix/config`** (new `packages/config`): move tsconfig presets out of `@osmix/shared`; add oxlint + oxfmt presets from the root configs; root and all workspaces consume it. Change intent (`@osmix/shared` minor for removed presets).
 4. **`@osmix/test-utils`**: add a `files` field shipping `monaco.*`, `monaco-gtfs.zip`, `yakima-osw` fixtures inside the package; resolve paths relative to the package (not repo root) in `packages/test-utils/src/fixtures.ts`. Keep large fixtures repo-local.
 5. **Facade audit**: for each workspace being extracted, list imports of `@osmix/core|load|json|pbf`; re-export what's needed from `packages/osmix/src/index.ts` (e.g. what `apps/vt-server` and `apps/shortbread` pull from `pbf`/`json`/`core`). Publish.
 
@@ -53,7 +53,7 @@ Target repos (org `osmix-dev`):
 **cli**
 
 - Move `packages/cli`; depends on published `osmix` + `@osmix/shortbread`.
-- Port Changesets config, a copy of `scripts/release.ts`, `release.yml` CLI executable steps (`packages/cli/scripts/release-executables.ts`), `ci.yml` `cli-executable` job. Set up OIDC trusted publishing for `@osmix/cli` from the new repo.
+- Port the `versioning` config in `pnpm-workspace.yaml`, the `publishConfig`/`prepack` package setup, `release.yml` with its CLI executable steps (`packages/cli/scripts/release-executables.ts`), `ci.yml` `cli-executable` job. Set up OIDC trusted publishing for `@osmix/cli` from the new repo.
 - Core: remove `cli` workspace and its CI/release steps. Deprecate nothing on npm — same package name continues from new repo.
 
 **apps**

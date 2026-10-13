@@ -15,10 +15,30 @@
     "./worker": "./src/osmix.worker.ts",
     "./worker-pool": "./src/worker-pool.ts"
   },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./worker": {
+        "types": "./dist/osmix.worker.d.ts",
+        "default": "./dist/osmix.worker.js"
+      },
+      "./worker-pool": {
+        "types": "./dist/worker-pool.d.ts",
+        "default": "./dist/worker-pool.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "fixtures:generate:merge-patch": "node scripts/generate-monaco-merge-patch.ts",
-    "profile:merge": "node --expose-gc test/merge-profile-cli.ts"
+    "profile:merge": "node --expose-gc test/merge-profile-cli.ts",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@osmix/change": "workspace:*",

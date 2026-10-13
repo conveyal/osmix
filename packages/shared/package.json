@@ -14,9 +14,22 @@
     "./tsconfig/app.json": "./tsconfig/app.json",
     "./*": "./src/*.ts"
   },
+  "publishConfig": {
+    "exports": {
+      "./tsconfig/base.json": "./tsconfig/base.json",
+      "./tsconfig/test.json": "./tsconfig/test.json",
+      "./tsconfig/app.json": "./tsconfig/app.json",
+      "./*": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "vitest bench"
+    "bench": "vitest bench",
+    "prepack": "pnpm run build"
   },
   "dependencies": {},
   "devDependencies": {

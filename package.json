@@ -9,14 +9,11 @@
     "dev": "portless",
     "fix": "oxfmt . && oxlint --fix",
     "knip": "knip",
-    "release": "node scripts/release.ts",
     "smoke": "node scripts/node-smoke.ts",
     "test": "vitest run",
-    "verify": "pnpm run check && pnpm run knip && pnpm run test",
-    "version": "changeset version && pnpm install"
+    "verify": "pnpm run check && pnpm change check && pnpm run knip && pnpm run test"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.3",
     "@shadcn/lint": "0.2.1",
     "@types/node": "catalog:",
     "knip": "^6.41.0",

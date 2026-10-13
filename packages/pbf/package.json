@@ -15,9 +15,26 @@
     "./protobuf": "./src/protobuf.ts",
     "./test/helpers": "./test/helpers.ts"
   },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./protobuf": {
+        "types": "./dist/protobuf.d.ts",
+        "default": "./dist/protobuf.js"
+      },
+      "./test/helpers": "./test/helpers.ts"
+    },
+    "access": "public"
+  },
   "scripts": {
     "bench": "vitest bench",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build"
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",

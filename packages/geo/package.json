@@ -14,8 +14,24 @@
     ".": "./src/tile.ts",
     "./*": "./src/*.ts"
   },
+  "publishConfig": {
+    "main": "./dist/tile.js",
+    "types": "./dist/tile.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/tile.d.ts",
+        "default": "./dist/tile.js"
+      },
+      "./*": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      }
+    },
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build"
   },
   "dependencies": {
     "@osmix/types": "workspace:*",

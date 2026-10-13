@@ -3,8 +3,9 @@
 ## Run These Every Change
 
 - While working: `pnpm run fix` to format and apply safe lint fixes, and `pnpm exec vitest run --changed origin/main` (or `--project @osmix/<name>`) for the tests your change touches.
-- Before committing: `pnpm run verify` (check, knip and every test project) must be green.
+- Before committing: `pnpm run verify` (check, change intents, knip and every test project) must be green.
 - Add or extend tests and documentation when behavior or public APIs change.
+- When a change affects a published package, record a change intent: `pnpm change <packages> --bump <patch|minor|major> --summary "..."` (`--bump none` if no release is needed). The summary becomes the CHANGELOG entry. See "Releasing" in `README.md`.
 - Before changing merge rules, matching actions, or merge workflow states, read [docs/merge-process.md](docs/merge-process.md). Update its affected rules/examples and linked regression tests in the same PR.
 - `pnpm run knip` flags unused files, exports, and dependencies, and imports missing from `package.json`. Configure false positives (non-standard entry points) in `knip.json`; do not keep dead exports.
 
@@ -66,7 +67,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 - `pnpm run check` runs `oxfmt --check` and `oxlint` without changing files. `oxlint` is type-aware and runs the TypeScript checker (`typeCheck` in `.oxlintrc.json`), so there is no separate `typecheck` script. Every `.ts` file must be in some `tsconfig.json`; the root one covers `scripts/` and root configs.
 - `pnpm run fix` runs `oxfmt` and `oxlint --fix`.
 - `pnpm run test` runs every vitest project once.
-- `pnpm run verify` runs `check`, `knip` and `test`.
+- `pnpm run verify` runs `check`, `pnpm change check`, `knip` and `test`.
 - `pnpm run knip` flags unused files, exports, and dependencies, and undeclared imports, across all workspaces.
 - `pnpm run smoke` packs the published packages and imports them from a clean consumer (CI runs it on Node and Bun).
 
