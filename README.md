@@ -169,7 +169,7 @@ pnpm change @osmix/core osmix --bump minor --summary "Add Osm.renumberNegativeId
 pnpm change status
 ```
 
-To release, run `pnpm version -r` on a branch from an up-to-date `main`. It applies the pending intents to versions and changelogs. Commit the result as "Version packages", open a pull request, and merge it. When CI passes on `main`, the release workflow runs `pnpm publish -r`, which publishes every version that is not yet on npm, then creates a `<name>@<version>` tag and GitHub release for each. Each package's `prepack` script builds it, and its `publishConfig` points the published entry points at `dist/`.
+To release, run `pnpm version -r` on a branch from an up-to-date `main`. It applies the pending intents to versions and changelogs. Commit the result as "Version packages", open a pull request, and merge it. When CI passes on `main`, the release workflow runs `pnpm publish -r`, which publishes every version that is not yet on npm. It then creates a `<name>@<version>` tag and GitHub release for each published version that lacks one, so rerunning a failed release fills any gaps. Each package's `prepack` script builds it, and its `publishConfig` points the published entry points at `dist/`.
 
 ## Apps
 

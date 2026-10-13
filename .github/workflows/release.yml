@@ -32,17 +32,23 @@ jobs:
       # Skips versions already on npm. `prepack` builds each package and `publishConfig`
       # points its entries at `dist/`. The checkout is detached, so skip the branch check.
       - name: Publish to npm
-        run: pnpm publish -r --no-git-checks --report-summary
+        run: pnpm publish -r --no-git-checks
 
+      # Derived from the package versions rather than this run's publish summary, so a rerun after
+      # a partial failure still releases versions that an earlier attempt published.
       - name: Create tags and GitHub releases
         run: |
-          jq -r '.publishedPackages[] | "\(.name)\t\(.version)"' pnpm-publish-summary.json |
-            while IFS=$'\t' read -r name version; do
-              dir=$(pnpm --filter "$name" exec pwd)
+          pnpm ls -r --depth -1 --json |
+            jq -r '.[] | select(.private != true and .name != null)
+              | "\(.name)\t\(.version)\t\(.path)"' |
+            while IFS=$'\t' read -r name version dir; do
+              tag="$name@$version"
+              gh release view "$tag" > /dev/null 2>&1 < /dev/null && continue
+              [ -n "$(pnpm view "$tag" version < /dev/null 2> /dev/null)" ] || continue
               awk -v v="$version" '$0 == "## " v {f=1; next} f && /^## / {exit} f' \
                 "$dir/CHANGELOG.md" > release-notes.md
-              gh release create "$name@$version" --target "$HEAD_SHA" \
-                --title "$name@$version" --notes-file release-notes.md < /dev/null
+              gh release create "$tag" --target "$HEAD_SHA" \
+                --title "$tag" --notes-file release-notes.md < /dev/null
             done
         env:
           GH_TOKEN: ${{ github.token }}
