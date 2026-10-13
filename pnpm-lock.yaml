@@ -656,10 +656,10 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
-    devDependencies:
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -728,6 +728,9 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
+      '@types/geojson':
+        specifier: 'catalog:'
+        version: 7946.0.16
     devDependencies:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
@@ -735,9 +738,6 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
-      '@types/geojson':
-        specifier: 'catalog:'
-        version: 7946.0.16
       lineclip:
         specifier: ^2.0.0
         version: 2.0.0
@@ -759,10 +759,10 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
-    devDependencies:
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -781,6 +781,9 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
+      '@types/geojson':
+        specifier: 'catalog:'
+        version: 7946.0.16
       hyparquet:
         specifier: ^1.31.0
         version: 1.31.3
@@ -788,9 +791,6 @@ importers:
       '@osmix/test-utils':
         specifier: workspace:*
         version: link:../test-utils
-      '@types/geojson':
-        specifier: 'catalog:'
-        version: 7946.0.16
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1007,13 +1007,13 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
+      '@types/geojson':
+        specifier: 'catalog:'
+        version: 7946.0.16
       shpjs:
         specifier: ^6.2.0
         version: 6.2.0
     devDependencies:
-      '@types/geojson':
-        specifier: 'catalog:'
-        version: 7946.0.16
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -19,10 +19,10 @@
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
+    "@types/geojson": "catalog:",
     "shpjs": "^6.2.0"
   },
   "devDependencies": {
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

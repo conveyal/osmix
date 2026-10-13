@@ -19,11 +19,11 @@
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
+    "@types/geojson": "catalog:",
     "hyparquet": "^1.31.0"
   },
   "devDependencies": {
     "@osmix/test-utils": "workspace:*",
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

@@ -18,10 +18,10 @@
     "@osmix/core": "workspace:*",
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
-    "@osmix/types": "workspace:*"
+    "@osmix/types": "workspace:*",
+    "@types/geojson": "catalog:"
   },
   "devDependencies": {
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {
