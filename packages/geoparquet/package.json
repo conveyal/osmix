@@ -22,14 +22,14 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
+    "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "@placemarkio/geojson-rewind": "catalog:",
+    "@types/geojson": "catalog:",
     "hyparquet": "^1.31.0"
   },
   "devDependencies": {
     "@osmix/test-utils": "workspace:*",
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

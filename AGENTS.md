@@ -77,7 +77,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 - Call `buildIndexes()` after changes before spatial queries.
 - MapLibre raster URLs: `<osmId>/<tileSize>/<z>/<x>/<y>.png`, with an optional `?role=base|patch` that picks the dataset's `--map-*` color.
 - Use throttled logging when streaming worker progress.
-- `@osmix/pbf` must stay dependency-free at runtime (helpers inlined; test helpers in `test/helpers`).
+- `@osmix/pbf` must stay dependency-free at runtime (helpers inlined, including the protobuf reader/writer in `src/protobuf.ts`; test helpers in `test/helpers`).
 - App work runs as `Tasks` (`@osmix/app-core`): one top-level task at a time (`TaskAlreadyRunningError` otherwise). A caller that wraps a hook which starts its own task (the load hooks do) must not start a second one around it.
 
 ## Style

@@ -12,6 +12,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./protobuf": "./src/protobuf.ts",
     "./test/helpers": "./test/helpers.ts"
   },
   "publishConfig": {
@@ -22,6 +23,10 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./protobuf": {
+        "types": "./dist/protobuf.d.ts",
+        "default": "./dist/protobuf.js"
+      },
       "./test/helpers": "./test/helpers.ts"
     },
     "access": "public"
@@ -31,12 +36,10 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "pnpm run build"
   },
-  "dependencies": {
-    "pbf": "catalog:"
-  },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
     "@osmix/test-utils": "workspace:*",
+    "pbf": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

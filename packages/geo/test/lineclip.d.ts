@@ -1,3 +1,4 @@
+// Types for the original `lineclip`, which the tests compare against.
 declare module "lineclip" {
   export function clipPolyline(
     points: [number, number][],

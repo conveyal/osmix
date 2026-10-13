@@ -1,3 +1,4 @@
+// Types for the original `geoflatbush`, which the tests compare against.
 declare module "geoflatbush" {
   import type Flatbush from "flatbush";
 

@@ -1,9 +1,11 @@
+import { dequal } from "dequal";
 import { describe, expect, it } from "vitest";
 
 import type { OsmNode, OsmRelation, OsmRelationMember, OsmWay } from "../src/types.ts";
 import {
   entityPropertiesEqual,
   getEntityType,
+  isDeepEqual,
   isMultipolygonRelation,
   isNode,
   isNodeEqual,
@@ -93,5 +95,57 @@ describe("utils", () => {
       };
       expect(isMultipolygonRelation(relation)).toBe(false);
     });
+  });
+});
+
+describe("isDeepEqual", () => {
+  const values: unknown[] = [
+    undefined,
+    null,
+    0,
+    -0,
+    1,
+    Number.NaN,
+    "",
+    "a",
+    true,
+    false,
+    [],
+    [1, 2],
+    [2, 1],
+    [
+      [1, 2],
+      [3, 4],
+    ],
+    [
+      [1, 2],
+      [3, 5],
+    ],
+    {},
+    { a: 1 },
+    { a: undefined },
+    { b: 1 },
+    { a: 1, b: { c: [1, "x"] } },
+    { b: { c: [1, "x"] }, a: 1 },
+    { a: 1, b: { c: [1, "y"] } },
+    [{ type: "way", ref: 1, role: "outer" }],
+    [{ type: "way", ref: 1, role: "inner" }],
+  ];
+
+  it("matches dequal for JSON-like values", () => {
+    for (const a of values) {
+      for (const b of values) {
+        expect(isDeepEqual(a, b), `${JSON.stringify(a)} vs ${JSON.stringify(b)}`).toBe(
+          dequal(a, b),
+        );
+        expect(isDeepEqual(structuredClone(a), b)).toBe(dequal(a, b));
+      }
+    }
+  });
+
+  it("throws for objects it does not compare", () => {
+    expect(() => isDeepEqual(new Uint32Array([1]), new Uint32Array([1]))).toThrow(TypeError);
+    expect(() => isDeepEqual(new Map(), {})).toThrow(TypeError);
+    expect(() => isDeepEqual([1], new Set([1]))).toThrow(TypeError);
   });
 });

@@ -76,7 +76,7 @@ describe("merge osm", () => {
         intersectionNodesRemoved: 0,
       });
       // These expected values are based on the yakima fixture files. If they change,
-      // it may indicate a change in entity comparison logic (which uses dequal for
+      // it may indicate a change in entity comparison logic (which uses isDeepEqual for
       // deep equality checks) or a change in the merge algorithm itself.
 
       baseOsm = applyChangesetToOsm(changeset);

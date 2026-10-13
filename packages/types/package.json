@@ -33,11 +33,9 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "pnpm run build"
   },
-  "dependencies": {
-    "dequal": "catalog:"
-  },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
+    "dequal": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

@@ -22,9 +22,6 @@
  * @module @osmix/core
  */
 
-// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
-/// <reference path="./types/geoflatbush.d.ts" />
-
 export type { IdOrIndex } from "./ids.ts";
 export type { OsmReader, OsmWriter } from "./contracts.ts";
 export { OsmEntityIndexBuildError, type OsmEntityIndexComponent } from "./entities.ts";

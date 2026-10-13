@@ -35,10 +35,9 @@
     "@osmix/router": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "dequal": "catalog:"
+    "@types/geojson": "catalog:"
   },
   "devDependencies": {
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {

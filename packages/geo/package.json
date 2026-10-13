@@ -34,12 +34,13 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
-    "@mapbox/tilebelt": "^2.0.3",
     "@osmix/types": "workspace:*",
-    "lineclip": "^2.0.0"
+    "@types/geojson": "catalog:"
   },
   "devDependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
     "@osmix/shared": "workspace:*",
+    "lineclip": "^2.0.0",
     "typescript": "catalog:"
   },
   "engines": {

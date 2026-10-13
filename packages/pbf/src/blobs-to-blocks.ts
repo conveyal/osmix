@@ -7,8 +7,6 @@
  * @module
  */
 
-import { PbfReader } from "pbf";
-
 import { type OsmPbfBlobFrame } from "./pbf-to-blobs.ts";
 import {
   type OsmPbfBlock,
@@ -16,6 +14,7 @@ import {
   readHeaderBlock,
   readPrimitiveBlock,
 } from "./proto/osmformat.ts";
+import { PbfReader } from "./protobuf.ts";
 import { MAX_BLOB_SIZE_BYTES } from "./spec.ts";
 import { webDecompress } from "./utils.ts";
 

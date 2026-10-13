@@ -22,9 +22,9 @@ import {
 } from "@osmix/types/relation-kind";
 import { bboxFromLonLats } from "@osmix/types/utils";
 import Flatbush from "flatbush";
-import { around as geoAround } from "geoflatbush";
 
 import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
+import { flatbushAround } from "./flatbush-around.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
 import { MAX_RELATION_MEMBERS, MAX_UINT32_OFFSET, assertCapacity } from "./limits.ts";
 import type { Nodes } from "./nodes.ts";
@@ -509,8 +509,7 @@ export class Relations extends Entities<OsmRelation> {
    */
   neighbors(lon: number, lat: number, maxResults?: number, maxDistanceKm?: number): number[] {
     if (this.size === 0) return [];
-    // Use geoflatbush for proper geographic distance calculations
-    return geoAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm, (index) => {
+    return flatbushAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm, (index) => {
       const offset = index * 4;
       return isValidSpatialBbox(
         this.bbox.at(offset),

@@ -9,6 +9,7 @@
  */
 
 import { clipPolygon, clipPolyline } from "@osmix/geo/lineclip";
+import { rewindRing } from "@osmix/geo/rewind";
 import {
   bboxToTilePx,
   clampAndRoundPx,
@@ -17,8 +18,6 @@ import {
   tileToBbox,
 } from "@osmix/geo/tile";
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/types";
-import { rewindGeometry } from "@placemarkio/geojson-rewind";
-import type { Polygon } from "geojson";
 
 import { compositeRGBA } from "./color.ts";
 
@@ -290,16 +289,8 @@ export class OsmixRasterTile {
       // so we skip the subpixel optimization for now to keep this robust.
     }
 
-    // Normalize winding order using rewind (outer counterclockwise, inner clockwise)
-    const normalizedRings = rings.map((ring) => {
-      const rewound = rewindGeometry({
-        type: "Polygon",
-        coordinates: [ring],
-      }) as Polygon;
-      const firstRing = rewound.coordinates[0];
-      if (!firstRing) return ring;
-      return firstRing as LonLat[];
-    });
+    // Wind every ring counterclockwise
+    const normalizedRings = rings.map((ring) => rewindRing(ring, false));
 
     // Project and clip all rings
     const tileBbox: [number, number, number, number] = [0, 0, this.tileSize, this.tileSize];
