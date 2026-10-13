@@ -18,8 +18,7 @@ import type {
   OsmRelation,
   OsmWay,
 } from "@osmix/types";
-import { getEntityType } from "@osmix/types/utils";
-import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
+import { getEntityType, isDeepEqual } from "@osmix/types/utils";
 
 import { ChangeRecordTable } from "../change-records.ts";
 import type { OsmChange, OsmEntityRef } from "../types.ts";
@@ -362,7 +361,7 @@ export class PlanOverlay {
     else if (type === "way") {
       const previous = existingEntity as OsmWay;
       const next = modifiedEntity as OsmWay;
-      if (!dequal(previous.refs, next.refs)) this.invalidateWayGeometry(id);
+      if (!isDeepEqual(previous.refs, next.refs)) this.invalidateWayGeometry(id);
       // A layer way read through the patch's index until now; with a record of its own, the
       // index of pending ways by node must list it even though its refs did not change.
       else if (!hadOwnRecord) this.updatePendingWayIncidence(id);

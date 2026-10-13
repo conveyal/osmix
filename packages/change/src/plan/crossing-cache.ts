@@ -7,7 +7,7 @@
  */
 import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
 import type { GeoBbox2D } from "@osmix/types";
-import { dequal } from "dequal";
+import { isDeepEqual } from "@osmix/types/utils";
 
 import type { PlanOverlay } from "./overlay.ts";
 
@@ -73,7 +73,7 @@ function changedWays(previous: PlanOverlay, current: PlanOverlay) {
   for (const id of recordIds(previous, current, "way")) {
     const before = previous.getWay(id);
     const after = current.getWay(id);
-    if (!dequal(before?.refs, after?.refs)) changed.add(id);
+    if (!isDeepEqual(before?.refs, after?.refs)) changed.add(id);
   }
   for (const id of recordIds(previous, current, "node")) {
     const before = previous.getNode(id);

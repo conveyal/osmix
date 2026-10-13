@@ -91,9 +91,9 @@ import {
   toPbfBuffer,
   toPbfStream,
 } from "@osmix/load";
+import { isDeepEqual } from "@osmix/types/utils";
 import { OsmixVtEncoder } from "@osmix/vt";
 import * as Comlink from "comlink";
-import { dequal } from "dequal/lite";
 
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
 import {
@@ -803,7 +803,7 @@ export class OsmixWorker extends EventTarget {
    * Skips re-sorting if filters are identical to current settings.
    */
   setChangesetFilters(changeTypes: OsmChangeTypes[], entityTypes: OsmEntityType[]) {
-    if (dequal(this.changeTypes, changeTypes) && dequal(this.entityTypes, entityTypes)) {
+    if (isDeepEqual(this.changeTypes, changeTypes) && isDeepEqual(this.entityTypes, entityTypes)) {
       return;
     }
     this.changeTypes = changeTypes;

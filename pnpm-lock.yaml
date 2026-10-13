@@ -656,9 +656,6 @@ importers:
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
-      dequal:
-        specifier: 'catalog:'
-        version: 2.0.3
     devDependencies:
       '@types/geojson':
         specifier: 'catalog:'
@@ -914,9 +911,6 @@ importers:
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
-      dequal:
-        specifier: 'catalog:'
-        version: 2.0.3
     devDependencies:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
@@ -1086,14 +1080,13 @@ importers:
         version: 7.0.2
 
   packages/types:
-    dependencies:
-      dequal:
-        specifier: 'catalog:'
-        version: 2.0.3
     devDependencies:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      dequal:
+        specifier: 'catalog:'
+        version: 2.0.3
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

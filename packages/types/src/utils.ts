@@ -2,12 +2,10 @@
  * General OSM entity utilities.
  *
  * Provides type guards, equality checks, and type detection for OSM entities.
- * Uses deep equality checking for tags, info, and entity-specific properties.
+ * Uses deep equality checking (`isDeepEqual`) for tags, info, and entity-specific properties.
  *
  * @module
  */
-
-import { dequal } from "dequal/lite";
 
 import type {
   GeoBbox2D,
@@ -20,10 +18,48 @@ import type {
 } from "./types.ts";
 
 /**
+ * Deep equality for JSON-like values: primitives, arrays and plain objects.
+ * `NaN` equals `NaN`, and objects must have the same own keys, so `{ a: undefined }` does not
+ * equal `{}`. Throws a `TypeError` for other objects, such as typed arrays, maps and dates.
+ */
+export function isDeepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
+    return a !== a && b !== b; // both NaN
+  }
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) return isPlainObject(b) ? false : throwUnsupported(b);
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!isDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (!isPlainObject(a)) return throwUnsupported(a);
+  if (Array.isArray(b)) return false;
+  if (!isPlainObject(b)) return throwUnsupported(b);
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  for (const key of keys) {
+    if (!Object.hasOwn(b, key) || !isDeepEqual(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+function isPlainObject(value: object): value is Record<string, unknown> {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function throwUnsupported(value: object): never {
+  throw new TypeError(`isDeepEqual does not compare ${value.constructor?.name ?? "this"} objects`);
+}
+
+/**
  * Check if two entities have equal tags and info.
  */
 function isTagsAndInfoEqual(a: OsmEntity, b: OsmEntity) {
-  return dequal(a.tags, b.tags) && dequal(a.info, b.info);
+  return isDeepEqual(a.tags, b.tags) && isDeepEqual(a.info, b.info);
 }
 
 /** Type guard: check if entity is a Node. */
@@ -48,18 +84,18 @@ export function isRelation(entity: OsmEntity): entity is OsmRelation {
 
 /** Check if two ways are equal (refs, tags, and info). */
 export function isWayEqual(a: OsmWay, b: OsmWay) {
-  return dequal(a.refs, b.refs) && isTagsAndInfoEqual(a, b);
+  return isDeepEqual(a.refs, b.refs) && isTagsAndInfoEqual(a, b);
 }
 
 /** Check if two relations are equal (members, tags, and info). */
 export function isRelationEqual(a: OsmRelation, b: OsmRelation) {
-  return dequal(a.members, b.members) && isTagsAndInfoEqual(a, b);
+  return isDeepEqual(a.members, b.members) && isTagsAndInfoEqual(a, b);
 }
 
 /** Check if two entities have equal properties (type-aware comparison). */
 export function entityPropertiesEqual(a: OsmEntity, b: OsmEntity) {
-  if (!dequal(a.tags, b.tags)) return false;
-  if (!dequal(a.info, b.info)) return false;
+  if (!isDeepEqual(a.tags, b.tags)) return false;
+  if (!isDeepEqual(a.info, b.info)) return false;
   if (isNode(a) && isNode(b)) return isNodeEqual(a, b);
   if (isWay(a) && isWay(b)) return isWayEqual(a, b);
   if (isRelation(a) && isRelation(b)) return isRelationEqual(a, b);

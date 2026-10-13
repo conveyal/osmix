@@ -19,9 +19,8 @@ import type {
   OsmRelation,
   OsmWay,
 } from "@osmix/types";
-import { entityPropertiesEqual } from "@osmix/types/utils";
+import { entityPropertiesEqual, isDeepEqual } from "@osmix/types/utils";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
-import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import type { ChangeRecordTable } from "./change-records.ts";
 import {
@@ -1146,7 +1145,7 @@ export class OsmChangeset {
         dedupedIdPairs.add(patchWay.id, baseWay.id);
         const currentBaseWay = this.getCurrentWay(baseWay);
         if (!currentBaseWay) return false;
-        if (!dequal(currentPatchWay.refs, currentBaseWay.refs)) return false;
+        if (!isDeepEqual(currentPatchWay.refs, currentBaseWay.refs)) return false;
         // Within one dataset both ways are existing data, so they must already agree (MP-I5).
         return sameDataset
           ? routingSemanticTagsEqual(currentPatchWay.tags, currentBaseWay.tags)
@@ -1406,7 +1405,7 @@ export class OsmChangeset {
       if (!coordinates || !intersectingWayCoords) continue;
 
       // Skip ways that are geometrically equal
-      if (dequal(coordinates, intersectingWayCoords)) continue;
+      if (isDeepEqual(coordinates, intersectingWayCoords)) continue;
 
       const intersectingPoints = waysIntersect(coordinates, intersectingWayCoords);
       for (const pt of intersectingPoints) {
