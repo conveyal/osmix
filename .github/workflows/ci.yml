@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: pnpm/setup@v2
+      - uses: pnpm/setup@v3
       - uses: oven-sh/setup-bun@v2
 
       - name: Format, lint and type check
@@ -42,7 +42,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: pnpm/setup@v2
+      - uses: pnpm/setup@v3
 
       - name: Install Chromium
         run: pnpm --filter @osmix/app exec playwright install --with-deps chromium
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: pnpm/setup@v2
+      - uses: pnpm/setup@v3
         with:
           runtime: node@${{ matrix.node }}
 
@@ -104,7 +104,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: pnpm/setup@v2
+      - uses: pnpm/setup@v3
         with:
           runtime: bun
 

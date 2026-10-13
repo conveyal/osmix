@@ -245,7 +245,7 @@ importers:
         specifier: ^6.41.0
         version: 6.41.0
       node:
-        specifier: runtime:^24.21.0
+        specifier: runtime:>=24.21.0 <25
         version: runtime:24.21.0
       oxfmt:
         specifier: ^0.72.0

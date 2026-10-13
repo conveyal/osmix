@@ -1,5 +1,36 @@
 # @osmix/core
 
+## 0.3.0
+
+### Minor Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- e4785fe: Expose structured typed-buffer and entity-finalization failures across workers, identify safe View-profile
+  retries for spatial capacity errors, and show persistent actionable dataset-load diagnostics in Merge.
+- 66eb7cd: **Breaking:** `Osm.bbox()` and `OsmInfo.bbox` are `null` for a dataset with no nodes.
+
+  Add `renumberNegativeIds` and `negativeIdMap`, which renumber new (negative) IDs after each entity type's highest ID for tools that reject negative IDs, with every way ref and relation member following. Ways, relations and strings beyond what the stored format holds (65,535 refs, members or bytes) now throw `OsmCapacityError`, which names the entity and the limit; the limits and `assertCapacity` are exported. `ResizeableTypedArray` is exported.
+
+### Patch Changes
+
+- df04f92: Add a cross-runtime managed worker pool with browser, Bun, and Node worker support,
+  cooperative cancellation utilities, a transferable Shortbread feature index, and worker-backed
+  consumer integrations.
+- 66eb7cd: Reuse built way and relation spatial indexes. `Ways.buildSpatialIndex()` and `Relations.buildSpatialIndex()` rebuilt their Flatbush trees on every call, so calling `Osm.buildSpatialIndexes()` on a loaded dataset repeated work. They now return the existing index, as node indexes already did.
+- 8be5c80: Allow Osmix to use its ArrayBuffer fallback when SharedArrayBuffer is unavailable, so browser
+  applications no longer need to install a global SharedArrayBuffer shim.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [466adc0]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/types@0.2.0
+  - @osmix/geo@0.1.1
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,30 @@
 # @osmix/vt
 
+## 0.1.0
+
+### Minor Changes
+
+- 66eb7cd: Add `clipTileLine` and `clampTilePoint`, the clipping `OsmixVtEncoder` uses for lines and points, so other tile writers can share it.
+
+### Patch Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- 66eb7cd: Return only the encoded bytes from `writeVtPbf`. It returned the writer's whole backing buffer, so every vector tile ended with unused zero bytes, sometimes nearly doubling its size.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [466adc0]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [66eb7cd]
+- Updated dependencies [8be5c80]
+  - @osmix/core@0.3.0
+  - @osmix/types@0.2.0
+  - @osmix/geo@0.1.1
+
 ## 0.0.14
 
 ### Patch Changes
