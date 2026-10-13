@@ -8,9 +8,9 @@
  */
 
 import { Osm, type OsmOptions, type OsmWriter } from "@osmix/core";
+import { rewindFeature } from "@osmix/geo/rewind";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 import type { OsmRelationMember, OsmTags } from "@osmix/types";
-import { rewindFeature } from "@placemarkio/geojson-rewind";
 import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polygon } from "geojson";
 
 import type { ReadShapefileDataTypes } from "./types.ts";

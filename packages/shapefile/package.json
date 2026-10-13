@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
+    "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "@placemarkio/geojson-rewind": "catalog:",
     "shpjs": "^6.2.0"
   },
   "devDependencies": {

@@ -8,9 +8,9 @@
  */
 
 import { Osm, type OsmOptions } from "@osmix/core";
+import { rewindGeometry } from "@osmix/geo/rewind";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 import type { OsmRelationMember, OsmTags } from "@osmix/types";
-import { rewindFeature } from "@placemarkio/geojson-rewind";
 import type { Geometry, LineString, MultiLineString, MultiPolygon, Point, Polygon } from "geojson";
 import {
   type AsyncBuffer,
@@ -505,14 +505,7 @@ function parseTags(
  */
 function normalizeGeometry(geometry: Geometry): Geometry {
   if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
-    // Use rewind to ensure correct winding order
-    const feature = {
-      type: "Feature" as const,
-      geometry,
-      properties: {},
-    };
-    const rewound = rewindFeature(feature);
-    return rewound.geometry ?? geometry;
+    return rewindGeometry(geometry);
   }
   return geometry;
 }

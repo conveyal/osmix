@@ -20,12 +20,10 @@
   },
   "dependencies": {
     "@osmix/geo": "workspace:*",
-    "@osmix/types": "workspace:*",
-    "@placemarkio/geojson-rewind": "catalog:"
+    "@osmix/types": "workspace:*"
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
-    "@types/geojson": "catalog:",
     "typescript": "catalog:"
   },
   "engines": {
